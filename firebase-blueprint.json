@@ -1,0 +1,194 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Application user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin", "professor"] },
+        "credits": { "type": "number" },
+        "noShowCount": { "type": "number" },
+        "penaltyUntil": { "type": "string", "format": "date-time" },
+        "suspensionUntil": { "type": "string", "format": "date-time" },
+        "canManageChampionships": { "type": "boolean" },
+        "allowedCourt1": { "type": "boolean" },
+        "fcmToken": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "role", "created_at"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Court booking",
+      "type": "object",
+      "properties": {
+        "courtId": { "type": "string", "enum": ["court1", "court2"] },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "date": { "type": "string" },
+        "dayOfWeek": { "type": "number" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "type": { "type": "string", "enum": ["single", "double", "lesson"] },
+        "status": { "type": "string", "enum": ["confirmed", "cancelled", "no-show"] },
+        "creditsUsed": { "type": "number" },
+        "maintenanceConfirmed": { "type": "boolean" },
+        "isFixed": { "type": "boolean" },
+        "professorName": { "type": "string" },
+        "isRanking": { "type": "boolean" },
+        "opponentName": { "type": "string" },
+        "partnerId": { "type": "string" },
+        "partnerName": { "type": "string" },
+        "isVisitorGame": { "type": "boolean" },
+        "visitorName": { "type": "string" },
+        "visitorPixPaid": { "type": "boolean" },
+        "observation": { "type": "string", "description": "Notes from the professor" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courtId", "userId", "userName", "startTime", "endTime", "type", "status", "created_at"]
+    },
+    "AdminAlert": {
+      "title": "Admin Alert",
+      "description": "System alerts for admins",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "bookingDate": { "type": "string" },
+        "bookingTime": { "type": "string" },
+        "type": { "type": "string", "enum": ["late_cancellation_attempt", "no_show_report", "empty_court_report"] },
+        "reporterId": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "bookingId", "type", "read", "created_at"]
+    },
+    "Championship": {
+      "title": "Championship",
+      "description": "Tournament details",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["singles", "doubles"] },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "registrationStartDate": { "type": "string" },
+        "registrationDeadline": { "type": "string" },
+        "maxParticipants": { "type": "number" },
+        "registrationFee": { "type": "number" },
+        "pixKey": { "type": "string" },
+        "isDrawnPairs": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["open", "closed", "finished"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "status", "created_at"]
+    },
+    "ChampionshipRegistration": {
+      "title": "Championship Registration",
+      "description": "User registration for a championship",
+      "type": "object",
+      "properties": {
+        "championshipId": { "type": "string" },
+        "userId1": { "type": "string" },
+        "userId2": { "type": "string" },
+        "userName1": { "type": "string" },
+        "userName2": { "type": "string" },
+        "status": { "type": "string", "enum": ["confirmed", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "informed", "paid"] },
+        "isDrawn": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["championshipId", "userId1", "status", "paymentStatus", "created_at"]
+    },
+    "ChampionshipMatch": {
+      "title": "Championship Match",
+      "description": "Match in a championship",
+      "type": "object",
+      "properties": {
+        "championshipId": { "type": "string" },
+        "round": { "type": "number" },
+        "matchNumber": { "type": "number" },
+        "participant1Id": { "type": "string" },
+        "participant2Id": { "type": "string" },
+        "participant1Name": { "type": "string" },
+        "participant2Name": { "type": "string" },
+        "score1": { "type": "string" },
+        "score2": { "type": "string" },
+        "winnerId": { "type": "string" },
+        "nextMatchId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "finished"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["championshipId", "round", "matchNumber", "status", "created_at"]
+    },
+    "ClubSettings": {
+      "title": "Club Settings",
+      "description": "Global club configuration",
+      "type": "object",
+      "properties": {
+        "requireRegisteredPartner": { "type": "boolean" },
+        "logoUrl": { "type": "string", "description": "Club logo image URL or Base64" },
+        "lastCreditsReset": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requireRegisteredPartner"]
+    },
+    "SlotNotification": {
+      "title": "Slot Notification",
+      "description": "Waiting list for a specific slot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date", "startTime", "created_at"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Court bookings"
+    },
+    "/admin_alerts/{alertId}": {
+      "schema": "AdminAlert",
+      "description": "System alerts"
+    },
+    "/championships/{championshipId}": {
+      "schema": "Championship",
+      "description": "Championships"
+    },
+    "/championship_registrations/{registrationId}": {
+      "schema": "ChampionshipRegistration",
+      "description": "Championship registrations"
+    },
+    "/championship_matches/{matchId}": {
+      "schema": "ChampionshipMatch",
+      "description": "Championship matches"
+    },
+    "/settings/{settingsId}": {
+      "schema": "ClubSettings",
+      "description": "Club settings"
+    },
+    "/slot_notifications/{notificationId}": {
+      "schema": "SlotNotification",
+      "description": "Slot notifications"
+    }
+  }
+}

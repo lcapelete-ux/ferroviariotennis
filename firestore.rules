@@ -1,0 +1,310 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - fullName: string (required, 1-100 chars)
+    //   - phone: string (optional)
+    //   - role: string (required, ['user', 'admin', 'professor'])
+    //   - credits: number (optional)
+    //   - noShowCount: number (optional)
+    //   - penaltyUntil: string (optional, ISO8601)
+    //   - suspensionUntil: string (optional, ISO8601)
+    //   - canManageChampionships: bool (optional)
+    //   - fcmToken: string (optional)
+    //   - created_at: string (required, ISO8601)
+    //   - updated_at: string (optional, ISO8601)
+    //
+    // Collection: bookings
+    // Document ID: {bookingId}
+    // Fields:
+    //   - courtId: string (required, ['court1', 'court2'])
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //   - userPhone: string (optional)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - dayOfWeek: number (optional)
+    //   - startTime: string (required, HH:MM)
+    //   - endTime: string (required, HH:MM)
+    //   - type: string (required, ['single', 'double', 'lesson'])
+    //   - status: string (required, ['confirmed', 'cancelled', 'no-show'])
+    //   - maintenanceConfirmed: bool (optional)
+    //   - isFixed: bool (optional)
+    //   - professorName: string (optional)
+    //   - isRanking: bool (optional)
+    //   - opponentName: string (optional)
+    //   - observation: string (optional)
+    //   - created_at: string (required, ISO8601)
+    //   - updated_at: string (optional, ISO8601)
+    //
+    // Collection: admin_alerts
+    // Document ID: {alertId}
+    // Fields:
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //   - userPhone: string (optional)
+    //   - bookingId: string (required)
+    //   - bookingDate: string (required)
+    //   - bookingTime: string (required)
+    //   - type: string (required, ['late_cancellation_attempt', 'no_show_report'])
+    //   - reporterId: string (optional)
+    //   - reporterName: string (optional)
+    //   - read: bool (required)
+    //   - created_at: string (required, ISO8601)
+    //
+    // Collection: championships
+    // Document ID: {championshipId}
+    // Fields:
+    //   - title: string (required)
+    //   - description: string (optional)
+    //   - type: string (required, ['singles', 'doubles'])
+    //   - startDate: string (optional)
+    //   - endDate: string (optional)
+    //   - registrationStartDate: string (optional)
+    //   - registrationDeadline: string (optional)
+    //   - status: string (required, ['open', 'closed', 'finished'])
+    //   - created_at: string (required, ISO8601)
+    //
+    // Collection: championship_registrations
+    // Document ID: {registrationId}
+    // Fields:
+    //   - championshipId: string (required)
+    //   - userId1: string (required)
+    //   - userId2: string (optional)
+    //   - userName1: string (required)
+    //   - userName2: string (optional)
+    //   - status: string (required, ['confirmed', 'cancelled'])
+    //   - paymentStatus: string (required, ['pending', 'informed', 'paid'])
+    //   - created_at: string (required, ISO8601)
+    //
+    // Collection: championship_matches
+    // Document ID: {matchId}
+    // Fields:
+    //   - championshipId: string (required)
+    //   - round: number (required)
+    //   - matchNumber: number (required)
+    //   - status: string (required, ['pending', 'finished'])
+    //   - created_at: string (required, ISO8601)
+    //
+    // Collection: settings
+    // Document ID: {settingsId}
+    // Fields:
+    //   - requireRegisteredPartner: bool (required)
+    //   - logoUrl: string (optional)
+    //   - clubName: string (optional)
+    //   - lastCreditsReset: string (optional)
+    //
+    // Collection: slot_notifications
+    // Document ID: {notificationId}
+    // Fields:
+    //   - userId: string (required)
+    //   - date: string (required)
+    //   - startTime: string (required)
+    //   - created_at: string (required, ISO8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "tennisffc2@gmail.com" || 
+         request.auth.uid == "Vj19gVz51DUn7e0vX0sJ2fG9T4V2" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function canManageChampionships() {
+      return isAdmin() || (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canManageChampionships == true
+      );
+    }
+
+    function isProfessor() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor';
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'fullName', 'role', 'created_at']) &&
+             data.uid == request.auth.uid &&
+             data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 100 &&
+             data.role in ['user', 'admin', 'professor'] &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidBooking(data) {
+      return hasRequiredFields(['courtId', 'userId', 'userName', 'startTime', 'endTime', 'type', 'status', 'created_at']) &&
+             data.courtId in ['court1', 'court2'] &&
+             data.userId is string &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() <= 100 &&
+             data.type in ['single', 'double', 'lesson'] &&
+             data.status in ['confirmed', 'cancelled', 'no-show'] &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidAlert(data) {
+      return hasRequiredFields(['userId', 'userName', 'bookingId', 'type', 'read', 'created_at']) &&
+             data.type in ['late_cancellation_attempt', 'no_show_report', 'empty_court_report'] &&
+             data.read is bool &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidChampionship(data) {
+      return hasRequiredFields(['title', 'status', 'created_at']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.status in ['open', 'closed', 'finished'] &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidRegistration(data) {
+      return hasRequiredFields(['championshipId', 'userId1', 'status', 'paymentStatus', 'created_at']) &&
+             data.status in ['confirmed', 'cancelled'] &&
+             data.paymentStatus in ['pending', 'informed', 'paid'] &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidMatch(data) {
+      return hasRequiredFields(['championshipId', 'round', 'matchNumber', 'status', 'created_at']) &&
+             data.status in ['pending', 'finished'] &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidSlotNotification(data) {
+      return hasRequiredFields(['userId', 'date', 'startTime', 'created_at', 'courtId', 'expiresAt']) &&
+             data.userId == request.auth.uid &&
+             isValidDateString(data.created_at);
+    }
+
+    function isValidMaintenanceReport(data) {
+      return hasRequiredFields(['message', 'status', 'read', 'created_at']) &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 1000 &&
+             data.status in ['pending', 'resolved'] &&
+             data.read is bool &&
+             isValidDateString(data.created_at);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data) && 
+                    (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && (
+        isOwner(uid) || 
+        isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credits', 'updated_at']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data) && 
+                    (request.resource.data.userId == request.auth.uid || isAdmin() || isProfessor());
+      allow update: if isAuthenticated() && isValidBooking(request.resource.data) &&
+                    (resource.data.userId == request.auth.uid || 
+                     resource.data.partnerId == request.auth.uid ||
+                     (resource.data.professorName != null && resource.data.professorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fullName) ||
+                     isAdmin() || 
+                     isProfessor() || 
+                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['maintenanceConfirmed', 'observation', 'updated_at'])));
+      allow delete: if isAuthenticated() && 
+                    (resource.data.userId == request.auth.uid || 
+                     resource.data.partnerId == request.auth.uid ||
+                     isAdmin() || 
+                     (isProfessor() && resource.data.professorName != null && resource.data.professorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fullName));
+    }
+
+    match /admin_alerts/{alertId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidAlert(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /championships/{championshipId} {
+      allow read: if isAuthenticated();
+      allow write: if canManageChampionships();
+    }
+
+    match /championship_registrations/{registrationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidRegistration(request.resource.data) &&
+                    (request.resource.data.userId1 == request.auth.uid || canManageChampionships());
+      allow update: if isAuthenticated() && isValidRegistration(request.resource.data) &&
+                    (resource.data.userId1 == request.auth.uid || canManageChampionships());
+      allow delete: if canManageChampionships();
+    }
+
+    match /championship_matches/{matchId} {
+      allow read: if isAuthenticated();
+      allow write: if canManageChampionships();
+    }
+
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (isAdmin() || (settingsId == 'club_profile' && request.resource.data.keys().hasOnly(['lastCreditsReset', 'updated_at'])));
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (settingsId == 'club_profile' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastCreditsReset', 'updated_at']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /slot_notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSlotNotification(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /maintenance_reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidMaintenanceReport(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
