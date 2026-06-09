@@ -758,23 +758,26 @@ export default function Admin() {
 
   const handleDownloadProject = async () => {
     try {
-      showAlert("Iniciando Download", "O projeto está sendo compactado. Por favor, aguarde...", 'info');
-      const response = await fetch('/api/export');
+      showAlert("Iniciando Backup", "Exportando dados do clube. Por favor, aguarde...", 'info');
+      const token = await user?.getIdToken();
+      const response = await fetch('/api/export', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error('Falha ao gerar o arquivo ZIP');
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'projeto_completo.zip';
+      a.download = `backup-tennis-ffc-${new Date().toISOString().slice(0, 10)}.zip`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      showAlert("Sucesso", "Download do projeto concluído!", 'success');
+      showAlert("Sucesso", "Backup de dados exportado com sucesso!", 'success');
     } catch (error) {
-      console.error('Erro ao baixar o projeto:', error);
-      showAlert("Erro", "Não foi possível baixar o projeto. Tente novamente.", 'error');
+      console.error('Erro ao exportar backup:', error);
+      showAlert("Erro", "Não foi possível exportar os dados. Tente novamente.", 'error');
     }
   };
 
@@ -1211,7 +1214,7 @@ export default function Admin() {
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors"
               >
                 <Download className="w-4 h-4" />
-                Baixar Projeto (ZIP)
+                Exportar Dados (ZIP)
               </button>
             )}
             <button onClick={() => navigate('/')} className="text-sm font-medium text-emerald-600 hover:text-emerald-700">

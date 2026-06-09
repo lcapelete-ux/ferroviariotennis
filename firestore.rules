@@ -281,11 +281,8 @@ service cloud.firestore {
 
     match /settings/{settingsId} {
       allow read: if true;
-      allow create: if isAuthenticated() && (isAdmin() || (settingsId == 'club_profile' && request.resource.data.keys().hasOnly(['lastCreditsReset', 'updated_at'])));
-      allow update: if isAuthenticated() && (
-        isAdmin() || 
-        (settingsId == 'club_profile' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastCreditsReset', 'updated_at']))
-      );
+      allow create: if isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
