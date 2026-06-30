@@ -4,7 +4,7 @@ import { Booking, UserProfile, Championship, ChampionshipRegistration, Champions
 import { format, startOfWeek, addDays, isSameDay, parseISO, setHours, setMinutes, isBefore, addMinutes, isAfter, getDay, isWithinInterval, addHours, subHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { isBookingOpen, getAvailableSlots, isDoublesOnly, calculateEndTime, getBookingLimit, isFridayOpenPlay as checkFridayOpenPlay } from '../utils/bookingRules';
-import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw } from 'lucide-react';
+import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw, Menu, ChevronLeft, Wrench } from 'lucide-react';
 import { logout, auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, getDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [viewingBracket, setViewingBracket] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'calendar' | 'ranking' | 'professor' | 'my-bookings' | 'free-slots' | 'profile' | 'admin-professors' | 'championships' | 'maintenance-report'>('calendar');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [maintenanceReportMessage, setMaintenanceReportMessage] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'list'>('day');
@@ -1454,7 +1455,192 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
   const nextOpening = getNextOpening();
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-12">
+    <div className="flex min-h-screen bg-zinc-50">
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside className={clsx(
+        "fixed inset-y-0 left-0 z-30 w-60 bg-white border-r border-zinc-100 flex flex-col transition-transform duration-300",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
+        {/* Brand */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5">
+            {globalSettings?.logoUrl ? (
+              <img src={globalSettings.logoUrl} alt="Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shrink-0">
+                <Trophy className="w-4 h-4 text-white" />
+              </div>
+            )}
+            <span className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">
+              {globalSettings?.clubName || 'Tennis FFC'}
+            </span>
+          </div>
+          <button
+            className="md:hidden p-1.5 text-zinc-400 hover:text-zinc-600 rounded-lg"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Credits card */}
+        <div className="px-4 py-3 border-b border-zinc-100">
+          <div className="bg-emerald-600 rounded-2xl px-4 py-3 text-white">
+            <p className="text-[9px] font-black uppercase tracking-widest opacity-75 mb-0.5">Créditos da Semana</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-black">
+                {(profile?.role === 'admin' || profile?.role === 'professor') ? '∞' : (profile?.credits || 0)}
+              </span>
+              {!(profile?.role === 'admin' || profile?.role === 'professor') && (
+                <span className="text-base opacity-60">/ 3</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+          <button
+            onClick={() => { setActiveTab('calendar'); setSelectedDate(new Date()); setCurrentDate(new Date()); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'calendar' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            )}
+          >
+            <CalendarDays className="w-4 h-4 shrink-0" />
+            Agenda
+          </button>
+          <button
+            onClick={() => { setActiveTab('my-bookings'); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'my-bookings' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            )}
+          >
+            <CalendarCheck className="w-4 h-4 shrink-0" />
+            Meus Agendamentos
+          </button>
+          <button
+            onClick={() => { setActiveTab('championships'); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'championships' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            )}
+          >
+            <Trophy className="w-4 h-4 shrink-0" />
+            Campeonatos
+          </button>
+          <button
+            onClick={() => { setActiveTab('free-slots'); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'free-slots' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            )}
+          >
+            <LayoutGrid className="w-4 h-4 shrink-0" />
+            Vagas Livres
+          </button>
+          <button
+            onClick={() => { setActiveTab('maintenance-report'); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'maintenance-report' ? "bg-amber-500 text-white" : "text-amber-600 hover:bg-amber-50"
+            )}
+          >
+            <Wrench className="w-4 h-4 shrink-0" />
+            Central de Relatos
+          </button>
+
+          {profile?.role === 'admin' && (
+            <>
+              <div className="pt-4 pb-1 px-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Administração</p>
+              </div>
+              <button
+                onClick={() => { setActiveTab('ranking'); setSidebarOpen(false); }}
+                className={clsx(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+                  activeTab === 'ranking' ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                )}
+              >
+                <List className="w-4 h-4 shrink-0" />
+                Ranking
+              </button>
+              <button
+                onClick={() => { setActiveTab('admin-professors'); setSidebarOpen(false); }}
+                className={clsx(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+                  activeTab === 'admin-professors' ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                )}
+              >
+                <UserCheck className="w-4 h-4 shrink-0" />
+                Profissionais
+              </button>
+              <button
+                onClick={() => navigate('/admin')}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                <Shield className="w-4 h-4 shrink-0" />
+                Painel Admin
+              </button>
+            </>
+          )}
+          {(profile?.role !== 'admin' && profile?.canManageChampionships) && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            >
+              <Shield className="w-4 h-4 shrink-0" />
+              Gerenciar
+            </button>
+          )}
+          {profile?.role === 'professor' && (
+            <button
+              onClick={() => { setActiveTab('professor'); setSidebarOpen(false); }}
+              className={clsx(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+                activeTab === 'professor' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+              )}
+            >
+              <GraduationCap className="w-4 h-4 shrink-0" />
+              Painel Professor
+            </button>
+          )}
+        </nav>
+
+        {/* Bottom: profile + logout */}
+        <div className="border-t border-zinc-100 p-3 space-y-0.5">
+          <button
+            onClick={() => { setActiveTab('profile'); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'profile' ? "bg-zinc-100 text-zinc-900" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            )}
+          >
+            <UserIcon className="w-4 h-4 shrink-0" />
+            Meu Perfil
+          </button>
+          <button
+            onClick={() => { logout(); navigate('/login'); }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left text-zinc-500 hover:bg-red-50 hover:text-red-600"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            Sair
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Main content area (offset by sidebar on md+) ── */}
+      <div className="flex-1 flex flex-col min-h-screen md:ml-60">
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
           <h1 className="text-xl font-black uppercase tracking-tighter text-zinc-900 flex items-center gap-2 italic">
@@ -1488,23 +1674,12 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
               </span>
               <RefreshCw className={clsx("w-3 h-3", isSyncing && "animate-spin")} />
             </button>
-            <button 
-              onClick={() => setActiveTab('profile')} 
-              className={clsx(
-                "p-2 rounded-full transition-all",
-                activeTab === 'profile' ? "bg-emerald-100 text-emerald-600" : "bg-zinc-100 text-zinc-400 hover:text-zinc-600"
-              )}
-              title="Meu Perfil"
+            <button
+              className="md:hidden p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-100 rounded-xl"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menu"
             >
-              <UserIcon className="w-5 h-5" />
-            </button>
-            {(profile?.role === 'admin' || profile?.canManageChampionships) && (
-              <button onClick={() => navigate('/admin')} className="text-sm font-medium text-white bg-zinc-800 hover:bg-zinc-900 px-3 py-1.5 rounded-full">
-                {profile?.role === 'admin' ? 'Admin' : 'Gerenciar'}
-              </button>
-            )}
-            <button onClick={() => { logout(); navigate('/login'); }} className="p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-100 rounded-full">
-              <LogOut className="w-4 h-4" />
+              <Menu className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -1651,87 +1826,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex overflow-x-auto gap-2 mb-8 hide-scrollbar scroll-smooth">
-          <button
-            onClick={() => { setActiveTab('calendar'); setSelectedDate(new Date()); setCurrentDate(new Date()); }}
-            className={clsx(
-              "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-              activeTab === 'calendar' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-            )}
-          >
-            Agenda
-          </button>
-          <button
-            onClick={() => setActiveTab('my-bookings')}
-            className={clsx(
-              "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-              activeTab === 'my-bookings' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-            )}
-          >
-            Meus Agendamentos
-          </button>
-          <button
-            onClick={() => setActiveTab('championships')}
-            className={clsx(
-              "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-              activeTab === 'championships' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-            )}
-          >
-            Campeonatos
-          </button>
-          <button
-            onClick={() => setActiveTab('free-slots')}
-            className={clsx(
-              "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-              activeTab === 'free-slots' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-            )}
-          >
-            Vagas Livres
-          </button>
-          <button
-            onClick={() => setActiveTab('maintenance-report')}
-            className={clsx(
-              "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-              activeTab === 'maintenance-report' ? "bg-amber-500 text-white shadow-lg shadow-amber-100" : "bg-white text-amber-500 hover:text-amber-600 border border-amber-100"
-            )}
-          >
-            Central de Relatos
-          </button>
-          {profile?.role === 'admin' && (
-            <>
-              <button
-                onClick={() => setActiveTab('ranking')}
-                className={clsx(
-                  "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-                  activeTab === 'ranking' ? "bg-zinc-900 text-white shadow-lg shadow-zinc-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-                )}
-              >
-                Ranking
-              </button>
-              <button
-                onClick={() => setActiveTab('admin-professors')}
-                className={clsx(
-                  "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-                  activeTab === 'admin-professors' ? "bg-zinc-900 text-white shadow-lg shadow-zinc-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-                )}
-              >
-                Profissionais
-              </button>
-            </>
-          )}
-          {profile?.role === 'professor' && (
-            <button
-              onClick={() => setActiveTab('professor')}
-              className={clsx(
-                "px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap",
-                activeTab === 'professor' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-white text-zinc-400 hover:text-zinc-600 border border-zinc-100"
-              )}
-            >
-              Painel Professor
-            </button>
-          )}
-        </div>
+
 
         {activeTab === 'calendar' ? (
           <>
@@ -3372,6 +3467,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
           </motion.div>
         )}
       </AnimatePresence>
+      </div>{/* end flex-1 main area */}
     </div>
   );
 }
