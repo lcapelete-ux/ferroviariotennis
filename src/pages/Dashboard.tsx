@@ -4,7 +4,7 @@ import { Booking, UserProfile, Championship, ChampionshipRegistration, Champions
 import { format, startOfWeek, addDays, isSameDay, parseISO, setHours, setMinutes, isBefore, addMinutes, isAfter, getDay, isWithinInterval, addHours, subHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { isBookingOpen, getAvailableSlots, isDoublesOnly, calculateEndTime, getBookingLimit, isFridayOpenPlay as checkFridayOpenPlay } from '../utils/bookingRules';
-import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw, Menu, ChevronLeft, Wrench } from 'lucide-react';
+import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw, Menu, ChevronLeft, Wrench, FileText } from 'lucide-react';
 import { logout, auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, getDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
@@ -40,7 +40,7 @@ export default function Dashboard() {
   const [championshipMatches, setChampionshipMatches] = useState<ChampionshipMatch[]>([]);
   const [viewingBracket, setViewingBracket] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'ranking' | 'professor' | 'my-bookings' | 'free-slots' | 'profile' | 'admin-professors' | 'championships' | 'maintenance-report'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'ranking' | 'professor' | 'my-bookings' | 'free-slots' | 'profile' | 'admin-professors' | 'championships' | 'maintenance-report' | 'rules'>('calendar');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [maintenanceReportMessage, setMaintenanceReportMessage] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
@@ -1467,8 +1467,8 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
 
       {/* ── Sidebar ── */}
       <aside className={clsx(
-        "fixed inset-y-0 left-0 z-30 w-60 bg-white border-r border-zinc-100 flex flex-col transition-transform duration-300",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        "fixed inset-y-0 left-0 z-30 w-60 bg-white border-r border-zinc-100 flex flex-col transition-transform duration-300 md:translate-x-0",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Brand */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-100">
@@ -1558,6 +1558,16 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
           >
             <Wrench className="w-4 h-4 shrink-0" />
             Central de Relatos
+          </button>
+          <button
+            onClick={() => { setActiveTab('rules'); setSidebarOpen(false); }}
+            className={clsx(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
+              activeTab === 'rules' ? "bg-zinc-100 text-zinc-900" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+            )}
+          >
+            <FileText className="w-4 h-4 shrink-0" />
+            Regras do Clube
           </button>
 
           {profile?.role === 'admin' && (
@@ -1805,26 +1815,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
         )}
 
         {/* Info Banner */}
-        <div className="mb-8 bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3 items-start">
-          <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">Regras de Agendamento:</p>
-            <ul className="list-disc list-inside space-y-1 opacity-90">
-              <li><strong>Abertura:</strong> Todo domingo às 12:00 liberamos a agenda da semana seguinte.</li>
-              <li><strong>Limite:</strong> Baseado em seus créditos (Administradores são ilimitados).</li>
-              <li><strong>Créditos:</strong> Todos começam com 3 créditos. Cada reserva consome 1 crédito de cada jogador (Administradores são isentos).</li>
-              <li><strong>Parceiro:</strong> Obrigatório ter um parceiro cadastrado para reservar (será consumido um crédito do parceiro também).</li>
-              <li><strong>Cancelamento:</strong> Cancelamento sem perda do crédito até 12 horas antes, após isso o crédito não é devolvido.</li>
-              <li><strong>No-Show:</strong> Falta consome 2 créditos e gera bloqueio de 48h. 3 faltas = suspensão.</li>
-              <li><strong>Denúncia Anônima:</strong> Se vir uma quadra marcada mas vazia, denuncie no app! O infrator perde créditos e é bloqueado.</li>
-              <li><strong>Manutenção:</strong> Obrigatório nivelar o saibro após o jogo (confirmar no app).</li>
-              <li><strong>Regra 30min:</strong> Se a quadra estiver livre faltando menos de 30min, pode agendar mesmo sem créditos/limite!</li>
-              <li><strong>Sextas (17h-19:30):</strong> Duplas Abertas (Open Play). Só chegar e jogar! 🎾</li>
-              <li><strong>Professores:</strong> Sem custo de crédito e agendamento livre na <strong>Quadra 2</strong>.</li>
-              <li><strong>Campeonatos:</strong> Qualquer sócio pode organizar torneios (solicitar liberação de acesso ao administrador).</li>
-            </ul>
-          </div>
-        </div>
+
 
 
 
@@ -2456,6 +2447,111 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                   Salvar Alterações
                 </button>
               </form>
+            </div>
+          </div>
+        ) : activeTab === 'rules' ? (
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900 mb-6">Regras do Clube</h2>
+            <div className="space-y-3">
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <CalendarDays className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Abertura da Agenda</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Todo domingo às 12:00 liberamos a agenda da semana seguinte.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Trophy className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Créditos</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Todos começam com 3 créditos. Cada reserva consome 1 crédito de cada jogador. Administradores são isentos.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Parceiro Obrigatório</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">É obrigatório ter um parceiro cadastrado para reservar. Um crédito também será consumido do parceiro.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Cancelamento</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Cancelamento sem perda de crédito até 12 horas antes. Após esse prazo, o crédito não é devolvido.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">No-Show (Falta)</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Falta consome 2 créditos e gera bloqueio de 48h. 3 faltas resultam em suspensão da conta.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-zinc-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Bell className="w-4 h-4 text-zinc-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Denúncia Anônima</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Se ver uma quadra reservada mas vazia, denuncie pelo app. O infrator perde créditos e é bloqueado.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-zinc-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Wrench className="w-4 h-4 text-zinc-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Manutenção do Saibro</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">É obrigatório nivelar o saibro após o jogo e confirmar no app.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <LayoutGrid className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Regra dos 30 Minutos</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Se a quadra estiver livre faltando menos de 30 min para o horário, qualquer sócio pode agendar sem precisar de créditos.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <UserCheck className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Sextas — Open Play (17h–19:30)</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Duplas Abertas toda sexta-feira das 17h às 19:30. Só chegar e jogar! 🎾</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Professores</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Sem custo de crédito e agendamento livre na Quadra 2.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Trophy className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-zinc-900 uppercase tracking-tight mb-0.5">Campeonatos</p>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Qualquer sócio pode organizar torneios. Solicite liberação de acesso ao administrador.</p>
+                </div>
+              </div>
             </div>
           </div>
         ) : activeTab === 'maintenance-report' ? (
