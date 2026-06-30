@@ -108,7 +108,7 @@ const AppContent = () => {
           transition={{ duration: 1.2 }}
         >
           <GlobalError />
-          <Router>
+          <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
             <div className="min-h-screen flex flex-col">
               <main className="flex-grow">
                 <Routes>
