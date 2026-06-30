@@ -2995,78 +2995,91 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
               <p className="text-zinc-500 text-sm">Participe dos nossos torneios e suba no ranking!</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {championships.map(champ => {
                 const myReg = myRegistrations.find(r => r.championshipId === champ.id);
                 const isRegistrationOpen = isAfter(new Date(), parseISO(champ.registrationStartDate)) && isBefore(new Date(), parseISO(champ.registrationDeadline));
                 const isDeadlinePast = isAfter(new Date(), parseISO(champ.registrationDeadline));
                 const isNotStarted = isBefore(new Date(), parseISO(champ.registrationStartDate));
-                
+                const hasBracket = championshipMatches.some(m => m.championshipId === champ.id);
+
                 return (
                   <div key={champ.id} className="bg-white rounded-3xl shadow-sm border border-zinc-100 overflow-hidden flex flex-col">
-                    <div className="p-6 flex-grow">
-                      <div className="flex justify-between items-start mb-4">
-                        <span className={clsx(
-                          "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-                          isRegistrationOpen ? "bg-emerald-100 text-emerald-700" : 
-                          isNotStarted ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
-                        )}>
-                          {isRegistrationOpen ? 'Inscrições Abertas' : 
-                           isNotStarted ? 'Em Breve' : 'Inscrições Encerradas'}
-                        </span>
-                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                    {/* Card header strip */}
+                    <div className="bg-zinc-900 px-5 pt-5 pb-4 relative overflow-hidden">
+                      <div className="absolute right-4 top-3 opacity-10">
+                        <Trophy className="w-16 h-16 text-white" />
+                      </div>
+                      <div className="flex items-start justify-between gap-2 relative z-10">
+                        <div>
+                          <span className={clsx(
+                            "inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-2",
+                            isRegistrationOpen ? "bg-emerald-500 text-white" :
+                            isNotStarted ? "bg-blue-500 text-white" : "bg-zinc-600 text-zinc-300"
+                          )}>
+                            {isRegistrationOpen ? 'Inscrições Abertas' :
+                             isNotStarted ? 'Em Breve' : 'Encerrado'}
+                          </span>
+                          <h3 className="text-base font-black text-white leading-tight">{champ.title}</h3>
+                        </div>
+                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest shrink-0 mt-1">
                           {champ.type === 'singles' ? 'Simples' : champ.isDrawnPairs ? 'Duplas Sorteadas' : 'Duplas'}
                         </span>
                       </div>
-                      
-                      <h3 className="text-xl font-black text-zinc-900 mb-2">{champ.title}</h3>
-                      <p className="text-sm text-zinc-600 mb-6 leading-relaxed">{champ.description}</p>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-6">
+                    </div>
+
+                    <div className="p-5 flex-grow flex flex-col gap-4">
+                      {champ.description && (
+                        <p className="text-sm text-zinc-500 leading-relaxed">{champ.description}</p>
+                      )}
+
+                      {/* Dates row */}
+                      <div className="grid grid-cols-2 gap-2">
                         <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Início</span>
+                          <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block mb-0.5">Início</span>
                           <span className="text-sm font-bold text-zinc-700">{format(parseISO(champ.startDate), 'dd/MM/yyyy')}</span>
                         </div>
                         <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Fim</span>
+                          <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block mb-0.5">Fim</span>
                           <span className="text-sm font-bold text-zinc-700">{format(parseISO(champ.endDate), 'dd/MM/yyyy')}</span>
                         </div>
                       </div>
 
-                      <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 mb-6">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">Valor da Inscrição</span>
-                          <span className="text-lg font-black text-emerald-700">
-                            {champ.registrationFee && champ.registrationFee > 0 
-                              ? `R$ ${champ.registrationFee.toFixed(2)}` 
-                              : 'Grátis'}
-                          </span>
+                      {/* Fee + deadlines */}
+                      <div className="flex items-center justify-between bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
+                        <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">Inscrição</span>
+                        <span className="text-base font-black text-emerald-700">
+                          {champ.registrationFee && champ.registrationFee > 0
+                            ? `R$ ${champ.registrationFee.toFixed(2)}`
+                            : 'Grátis'}
+                        </span>
+                      </div>
+
+                      <div className="text-xs font-bold text-zinc-400 space-y-1">
+                        <div className="flex items-center gap-1.5 text-blue-500">
+                          <Calendar className="w-3.5 h-3.5 shrink-0" />
+                          Abertura: {format(parseISO(champ.registrationStartDate), "dd/MM 'às' HH:mm")}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-amber-500">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          Prazo: {format(parseISO(champ.registrationDeadline), "dd/MM 'às' HH:mm")}
                         </div>
                       </div>
 
-                      <div className="space-y-2 text-xs font-bold text-zinc-500 bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
-                        <div className="flex items-center gap-2 text-blue-600">
-                          <Calendar className="w-4 h-4" />
-                          Início Inscrições: {format(parseISO(champ.registrationStartDate), "dd/MM 'às' HH:mm")}
-                        </div>
-                        <div className="flex items-center gap-2 text-amber-600">
-                          <AlertCircle className="w-4 h-4" />
-                          Prazo Inscrição: {format(parseISO(champ.registrationDeadline), "dd/MM 'às' HH:mm")}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-6 bg-zinc-50 border-t border-zinc-100 flex flex-col gap-3">
-                      {championshipMatches.some(m => m.championshipId === champ.id) && (
+                      {/* Ver chaves button — shown inline when bracket exists */}
+                      {hasBracket && (
                         <button
                           onClick={() => setViewingBracket(champ.id)}
-                          className="w-full py-3 bg-white border-2 border-zinc-200 rounded-2xl text-sm font-black text-zinc-700 hover:bg-zinc-100 transition-all shadow-sm flex items-center justify-center gap-2"
+                          className="w-full py-2.5 rounded-2xl text-sm font-black text-zinc-900 transition-all active:scale-95 flex items-center justify-center gap-2"
+                          style={{ background: '#fbbf24' }}
                         >
-                          <Trophy className="w-4 h-4 text-amber-500" />
-                          Ver Chaves do Torneio
+                          <Trophy className="w-4 h-4" />
+                          Ver Chaves
                         </button>
                       )}
-                      
+                    </div>
+
+                    <div className="px-5 pb-5 flex flex-col gap-3">
                       {myReg ? (
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm bg-emerald-100/50 p-3 rounded-2xl border border-emerald-200">
@@ -3225,82 +3238,136 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
         confirmDisabled={modal.confirmDisabled}
       />
 
-      {viewingBracket && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-5xl p-8 border border-zinc-100 my-8">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-zinc-900">
-                  Chaves do Campeonato: {championships.find(c => c.id === viewingBracket)?.title}
-                </h3>
-                <p className="text-sm text-zinc-500 mt-1">Acompanhe o progresso do torneio em tempo real.</p>
-              </div>
-              <button onClick={() => setViewingBracket(null)} className="text-zinc-400 hover:text-zinc-600">
-                <X className="w-8 h-8" />
+      {viewingBracket && (() => {
+        const champ = championships.find(c => c.id === viewingBracket);
+        const champRegs = allRegistrations.filter(r => r.championshipId === viewingBracket);
+        const totalRounds = Math.max(1, Math.ceil(Math.log2(Math.max(champRegs.length, 2))));
+
+        const getRoundLabel = (round: number) => {
+          if (round === totalRounds) return 'Final';
+          if (round === totalRounds - 1 && totalRounds > 2) return 'Semi-Final';
+          if (round === 1) return '1ª Rodada';
+          return `${round}ª Rodada`;
+        };
+
+        return (
+          <div className="fixed inset-0 z-[120] flex flex-col" style={{ background: '#080e0b' }}>
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+              <button
+                onClick={() => setViewingBracket(null)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl shrink-0 transition-all active:scale-95"
+                style={{ background: 'rgba(255,255,255,0.1)' }}
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
               </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.3)' }}>Chaves do Torneio</p>
+                <h3 className="text-sm font-black text-white truncate">{champ?.title}</h3>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest shrink-0" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                {champRegs.length} jogadores
+              </span>
             </div>
 
-            <div className="flex gap-12 overflow-x-auto pb-8 min-h-[600px]">
-              {Array.from({ length: Math.ceil(Math.log2(allRegistrations.filter(r => r.championshipId === viewingBracket).length)) }).map((_, roundIdx) => {
-                const round = roundIdx + 1;
-                const matchesInRound = championshipMatches
-                  .filter(m => m.championshipId === viewingBracket && m.round === round)
-                  .sort((a, b) => a.matchNumber - b.matchNumber);
-                
-                return (
-                  <div key={round} className="flex flex-col gap-8 min-w-[250px]">
-                    <h4 className="text-center font-black text-zinc-400 uppercase tracking-widest text-xs mb-4">
-                      {round === 1 ? 'Primeira Rodada' : 
-                       round === Math.ceil(Math.log2(allRegistrations.filter(r => r.championshipId === viewingBracket).length)) ? 'Final' : 
-                       `Rodada ${round}`}
-                    </h4>
-                    <div className="flex flex-col justify-around flex-grow gap-8">
-                      {matchesInRound.map(match => (
-                        <div key={match.id} className="bg-zinc-50 border-2 border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                          <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white">
-                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jogo {match.matchNumber + 1}</span>
-                            {match.status === 'finished' && (
-                              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full">Finalizado</span>
-                            )}
-                          </div>
-                          
-                          <div className="p-4 space-y-4">
-                            <div className="flex items-center justify-between gap-4">
-                              <span className={clsx(
-                                "text-sm font-bold truncate flex-grow",
-                                match.winnerId === match.participant1Id && match.winnerId ? "text-emerald-600" : "text-zinc-700",
-                                !match.participant1Name && "text-zinc-300 italic"
-                              )}>
-                                {match.participant1Name || 'Aguardando...'}
-                              </span>
-                              <div className="w-20 h-10 flex items-center justify-center font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-xl">
-                                {match.score1 || '-'}
+            {/* Bracket */}
+            <div
+              className="flex-1"
+              style={{ overflow: 'auto', WebkitOverflowScrolling: 'touch' as any, padding: '20px 16px 32px' }}
+            >
+              <div style={{ display: 'flex', gap: 12, width: 'max-content', minHeight: '100%', alignItems: 'stretch' }}>
+                {Array.from({ length: totalRounds }).map((_, roundIdx) => {
+                  const round = roundIdx + 1;
+                  const isFinal = round === totalRounds;
+                  const matchesInRound = championshipMatches
+                    .filter(m => m.championshipId === viewingBracket && m.round === round)
+                    .sort((a, b) => a.matchNumber - b.matchNumber);
+
+                  return (
+                    <div key={round} style={{ width: 188, display: 'flex', flexDirection: 'column' }}>
+                      {/* Round label */}
+                      <div className="text-center mb-3">
+                        <span
+                          className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full"
+                          style={isFinal
+                            ? { background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }
+                            : { color: 'rgba(255,255,255,0.28)' }}
+                        >
+                          {getRoundLabel(round)}
+                        </span>
+                      </div>
+
+                      {/* Matches */}
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', gap: 10 }}>
+                        {matchesInRound.length > 0 ? matchesInRound.map(match => {
+                          const p1Wins = !!(match.winnerId && match.winnerId === match.participant1Id);
+                          const p2Wins = !!(match.winnerId && match.winnerId === match.participant2Id);
+                          const done = match.status === 'finished';
+
+                          return (
+                            <div
+                              key={match.id}
+                              className="rounded-2xl overflow-hidden"
+                              style={{ background: '#141f1a', border: '1px solid rgba(255,255,255,0.07)' }}
+                            >
+                              {/* Match label */}
+                              <div
+                                className="px-3 py-1.5 flex items-center justify-between"
+                                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+                              >
+                                <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                                  Jogo {match.matchNumber + 1}
+                                </span>
+                                {done && (
+                                  <span className="text-[9px] font-black uppercase" style={{ color: '#34d399' }}>✓ Fim</span>
+                                )}
                               </div>
+
+                              {/* Player rows */}
+                              {[
+                                { name: match.participant1Name, score: match.score1, wins: p1Wins },
+                                { name: match.participant2Name, score: match.score2, wins: p2Wins },
+                              ].map((p, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center gap-2 px-2 py-2 mx-1 my-1 rounded-xl"
+                                  style={{ background: p.wins ? 'rgba(52,211,153,0.1)' : 'transparent' }}
+                                >
+                                  <span
+                                    className="text-xs font-bold flex-1 truncate"
+                                    style={{ color: p.wins ? '#34d399' : p.name ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.2)', fontStyle: p.name ? 'normal' : 'italic' }}
+                                  >
+                                    {p.name || 'Aguardando...'}
+                                  </span>
+                                  <span
+                                    className="text-sm font-black w-7 text-center"
+                                    style={{ color: p.wins ? '#34d399' : 'rgba(255,255,255,0.35)' }}
+                                  >
+                                    {p.score || '—'}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                            
-                            <div className="flex items-center justify-between gap-4">
-                              <span className={clsx(
-                                "text-sm font-bold truncate flex-grow",
-                                match.winnerId === match.participant2Id && match.winnerId ? "text-emerald-600" : "text-zinc-700",
-                                !match.participant2Name && "text-zinc-300 italic"
-                              )}>
-                                {match.participant2Name || 'Aguardando...'}
-                              </span>
-                              <div className="w-20 h-10 flex items-center justify-center font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-xl">
-                                {match.score2 || '-'}
-                              </div>
-                            </div>
+                          );
+                        }) : (
+                          <div className="rounded-2xl p-4 text-center" style={{ background: '#141f1a', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <p className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.18)' }}>Aguardando</p>
                           </div>
-                        </div>
-                      ))}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom hint */}
+            <div className="text-center pb-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+              <p className="text-[10px] font-bold" style={{ color: 'rgba(255,255,255,0.15)' }}>← Deslize para ver todas as rodadas →</p>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Animated Booking Confirmation Overlay */}
       <AnimatePresence>
