@@ -110,14 +110,15 @@ const FooterAware = ({ children }: { children: React.ReactNode }) => {
 
 const AppContent = () => {
   const [minTimerDone, setMinTimerDone] = useState(false);
-  const { loading: settingsLoading } = useSettings();
 
   useEffect(() => {
-    const timer = setTimeout(() => setMinTimerDone(true), 2400);
+    // PreLoader shows for exactly this duration, then the app renders.
+    // Firebase settings load in the background — we don't block on them.
+    const timer = setTimeout(() => setMinTimerDone(true), 2000);
     return () => clearTimeout(timer);
   }, []);
 
-  const appLoading = settingsLoading || !minTimerDone;
+  const appLoading = !minTimerDone;
 
   return (
     <AnimatePresence mode="wait">
