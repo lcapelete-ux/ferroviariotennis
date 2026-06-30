@@ -10,9 +10,9 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const BATCH_SIZE = 400; // Firestore batch limit is 500; stay well under it
 
 function getDb() {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const projectId  = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error('Credenciais do Firebase Admin ausentes (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).');
@@ -23,19 +23,19 @@ function getDb() {
 }
 
 /**
- * Returns the most recent UTC instant <= `now` corresponding to "Sunday at brtHour:00" in Brazil time.
- * Works by representing Brazil wall-clock time as UTC values (shifting by BRT_OFFSET_MS).
+ * Most recent UTC instant <= `now` that corresponds to "Sunday at brtHour:brtMinute" in Brazil time.
+ * Brazil (América/São_Paulo) is fixed UTC-3 with no DST since 2019.
  */
-function lastBrtSundayMilestone(now: Date, brtHour: number): Date {
+function lastBrtSundayMilestone(now: Date, brtHour: number, brtMinute = 0): Date {
   const wallClock = new Date(now.getTime() - BRT_OFFSET_MS);
   const milestoneWall = new Date(Date.UTC(
     wallClock.getUTCFullYear(),
     wallClock.getUTCMonth(),
     wallClock.getUTCDate() - wallClock.getUTCDay(), // rewind to this BRT-Sunday
-    brtHour, 0, 0, 0,
+    brtHour, brtMinute, 0, 0,
   ));
   const milestoneUtc = new Date(milestoneWall.getTime() + BRT_OFFSET_MS);
-  // If that milestone is still in the future, use the one from last week
+  // If that milestone is still in the future, use last week's
   return milestoneUtc > now ? new Date(milestoneUtc.getTime() - WEEK_MS) : milestoneUtc;
 }
 
@@ -44,9 +44,12 @@ export default async (_req: Request) => {
     const db = getDb();
     const now = new Date();
 
-    // Most recent Sunday milestones: 11:00 BRT (zero out) and 12:00 BRT (refill to 3)
-    const zeroMilestone   = lastBrtSundayMilestone(now, 11);
-    const refillMilestone = lastBrtSundayMilestone(now, 12);
+    // Weekly credit cycle (Brazil time):
+    //   Sunday 11:50 BRT → zero out all user credits (= 0)
+    //   Sunday 12:00 BRT → refill all user credits (= 3)
+    //   Admins and professors are always set to 99 (unlimited) and excluded from the cycle.
+    const zeroMilestone   = lastBrtSundayMilestone(now, 11, 50); // domingo 11:50 BRT
+    const refillMilestone = lastBrtSundayMilestone(now, 12,  0); // domingo 12:00 BRT
 
     // Whichever milestone is more recent is the one currently in effect
     const [targetMilestone, targetAmount] =
@@ -56,7 +59,7 @@ export default async (_req: Request) => {
     const nowIso = now.toISOString();
 
     // Atomic claim: only one invocation can advance lastCreditsReset past this milestone.
-    // Concurrent or retried invocations will read the updated value and skip.
+    // Concurrent or retried invocations see the updated value and skip immediately.
     const claimed = await db.runTransaction(async (tx) => {
       const snap = await tx.get(settingsRef);
       const lastResetStr = snap.exists
@@ -73,7 +76,7 @@ export default async (_req: Request) => {
       return Response.json({ success: true, skipped: true, targetMilestone: targetMilestone.toISOString() });
     }
 
-    // Apply credit reset to all users in batches
+    // Apply credit reset to all users in chunks to stay within Firestore batch limits
     const usersSnap = await db.collection('users').get();
     let resetCount = 0;
     let unlimitedCount = 0;
@@ -83,6 +86,7 @@ export default async (_req: Request) => {
       for (const userDoc of usersSnap.docs.slice(i, i + BATCH_SIZE)) {
         const data = userDoc.data();
         if (data.role === 'professor' || data.role === 'admin') {
+          // Admins/professors are unlimited — only touch if out of sync
           if (data.credits !== 99) {
             batch.update(userDoc.ref, { credits: 99, updated_at: nowIso });
           }
@@ -97,10 +101,17 @@ export default async (_req: Request) => {
 
     console.log(
       `[reset-credits] Marco ${targetMilestone.toISOString()} aplicado ` +
-      `(créditos=${targetAmount}): ${resetCount} usuários, ${unlimitedCount} ilimitados.`
+      `(créditos=${targetAmount}): ${resetCount} usuários resetados, ${unlimitedCount} ilimitados ignorados.`
     );
 
-    return Response.json({ success: true, skipped: false, targetMilestone: targetMilestone.toISOString(), targetAmount, resetCount, unlimitedCount });
+    return Response.json({
+      success: true,
+      skipped: false,
+      targetMilestone: targetMilestone.toISOString(),
+      targetAmount,
+      resetCount,
+      unlimitedCount,
+    });
   } catch (err) {
     console.error('[reset-credits] Erro:', err);
     return new Response(
@@ -110,6 +121,6 @@ export default async (_req: Request) => {
   }
 };
 
-// Runs every 15 minutes. The atomic claim inside the handler ensures
-// only one invocation actually applies each weekly milestone.
-export const config = { schedule: '*/15 * * * *' };
+// Runs every 5 minutes so transitions happen within 5 minutes of the target time.
+// The atomic Firestore claim ensures each milestone is applied exactly once.
+export const config = { schedule: '*/5 * * * *' };
