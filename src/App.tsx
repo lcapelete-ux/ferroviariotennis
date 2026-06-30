@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Welcome from './pages/Welcome';
@@ -10,25 +10,30 @@ import Profile from './pages/Profile';
 import { AlertCircle } from 'lucide-react';
 import PreLoader from './components/PreLoader';
 import { AnimatePresence, motion } from 'motion/react';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
+
+const MiniLoader = () => (
+  <div
+    className="fixed inset-0 z-[9998] flex items-center justify-center"
+    style={{ background: 'linear-gradient(160deg, #011a0d 0%, #022b15 50%, #011a0d 100%)' }}
+  >
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center gap-4"
+    >
+      <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-[#c8f020] animate-spin" />
+      <p className="text-white/30 text-[9px] font-bold uppercase tracking-[0.5em]">Carregando</p>
+    </motion.div>
+  </div>
+);
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-16 h-16 border-4 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user || !profile) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (adminOnly && profile.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (loading) return <MiniLoader />;
+  if (!user || !profile) return <Navigate to="/" replace />;
+  if (adminOnly && profile.role !== 'admin') return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 };
@@ -36,14 +41,7 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
 const AuthenticatedRedirect = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-16 h-16 border-4 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
+  if (loading) return <MiniLoader />;
   if (user && profile) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
@@ -67,7 +65,7 @@ const GlobalError = () => {
               {error}
             </div>
             <div className="flex flex-wrap gap-3">
-              <button 
+              <button
                 onClick={() => window.location.reload()}
                 className="px-6 py-3 text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all active:scale-95 shadow-md flex items-center gap-2 bg-amber-600 hover:bg-amber-700"
               >
@@ -81,16 +79,41 @@ const GlobalError = () => {
   );
 };
 
-import { SettingsProvider, useSettings } from './context/SettingsContext';
+const FooterAware = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  const hideFooter = ['/dashboard', '/admin', '/profile'].some(p => location.pathname.startsWith(p));
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <main className="flex-grow">{children}</main>
+      {!hideFooter && (
+        <footer className="bg-white border-t py-6">
+          <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-zinc-400 text-[10px] font-bold uppercase tracking-widest">
+            <p>© {new Date().getFullYear()} Tennis FFC — Clube de Tênis Ferroviário</p>
+            <p>
+              Desenvolvido por{' '}
+              <a
+                href="https://wa.me/5515991334809"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-600 hover:text-emerald-700 transition-colors"
+              >
+                Marcelo Capelete
+              </a>
+            </p>
+          </div>
+        </footer>
+      )}
+    </div>
+  );
+};
 
 const AppContent = () => {
   const [minTimerDone, setMinTimerDone] = useState(false);
   const { loading: settingsLoading } = useSettings();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinTimerDone(true);
-    }, 2800); // 2.8 seconds pre-loader for impact
+    const timer = setTimeout(() => setMinTimerDone(true), 2400);
     return () => clearTimeout(timer);
   }, []);
 
@@ -105,34 +128,21 @@ const AppContent = () => {
           key="content"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1.2 }}
+          transition={{ duration: 0.8 }}
         >
           <GlobalError />
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-            <div className="min-h-screen flex flex-col">
-              <main className="flex-grow">
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/" element={<AuthenticatedRedirect><Landing /></AuthenticatedRedirect>} />
-                  <Route path="/welcome" element={<AuthenticatedRedirect><Welcome /></AuthenticatedRedirect>} />
-                  <Route path="/login" element={<AuthenticatedRedirect><Login /></AuthenticatedRedirect>} />
-                  
-                  {/* Private Routes */}
-                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                  <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
-                  
-                  {/* Default Fallback */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-              <footer className="bg-white border-t py-8 text-center">
-                <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-zinc-400 text-xs font-medium uppercase tracking-widest">
-                  <p>© {new Date().getFullYear()} TENNIS HUB - CLUBE DE TÊNIS FERROVIÁRIO</p>
-                  <p>DESENVOLVIDO POR <a href="https://wa.me/5515991334809" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 font-bold transition-colors">MARCELO CAPELETE</a></p>
-                </div>
-              </footer>
-            </div>
+            <FooterAware>
+              <Routes>
+                <Route path="/" element={<AuthenticatedRedirect><Landing /></AuthenticatedRedirect>} />
+                <Route path="/welcome" element={<AuthenticatedRedirect><Welcome /></AuthenticatedRedirect>} />
+                <Route path="/login" element={<AuthenticatedRedirect><Login /></AuthenticatedRedirect>} />
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </FooterAware>
           </Router>
         </motion.div>
       )}
