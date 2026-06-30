@@ -1874,7 +1874,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
             {calendarView === 'day' ? (
               <>
                 {/* Day strip */}
-                <div ref={dayTabsRef} className="flex overflow-x-auto gap-2 pb-2 mb-5 hide-scrollbar">
+                <div ref={dayTabsRef} className="flex gap-1 pb-2 mb-5 hide-scrollbar" style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch'}}>
                   {weekDays.map(day => {
                     const isSelected = isSameDay(selectedDate, day);
                     const isToday = isSameDay(day, new Date());
@@ -1883,7 +1883,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                         key={day.toISOString()}
                         onClick={() => setSelectedDate(day)}
                         className={clsx(
-                          "flex flex-col items-center min-w-[52px] py-2 px-1 rounded-2xl transition-all shrink-0",
+                          "flex flex-col items-center min-w-[40px] py-2 px-1 rounded-2xl transition-all shrink-0",
                           isSelected
                             ? "bg-emerald-600 text-white shadow-md"
                             : "bg-white text-zinc-500 hover:bg-emerald-50 hover:text-emerald-700"
