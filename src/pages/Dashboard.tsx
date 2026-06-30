@@ -4,7 +4,7 @@ import { Booking, UserProfile, Championship, ChampionshipRegistration, Champions
 import { format, startOfWeek, addDays, isSameDay, parseISO, setHours, setMinutes, isBefore, addMinutes, isAfter, getDay, isWithinInterval, addHours, subHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { isBookingOpen, getAvailableSlots, isDoublesOnly, calculateEndTime, getBookingLimit, isFridayOpenPlay as checkFridayOpenPlay } from '../utils/bookingRules';
-import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw, Menu, ChevronLeft, Wrench, FileText } from 'lucide-react';
+import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw, Menu, ChevronLeft, ChevronRight, Wrench, FileText } from 'lucide-react';
 import { logout, auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, getDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
@@ -352,6 +352,8 @@ ${window.location.origin}`;
 
   const isFetchingRef = useRef(false);
   const lastFetchTimeRef = useRef(0);
+  const swipeTouchStartXRef = useRef<number | null>(null);
+  const dayTabsRef = useRef<HTMLDivElement>(null);
 
   const fetchInitialData = useCallback(async (force = false) => {
     if (!profile || (isFetchingRef.current && !force)) return;
@@ -1786,104 +1788,151 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
               </div>
             )}
 
-            {/* Week Navigation & View Selector */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-zinc-800 capitalize">
-                  {format(startOfCurrentWeek, "MMMM yyyy", { locale: ptBR })}
-                </h2>
-                <div className="flex gap-1 bg-zinc-100 p-1 rounded-xl">
+            {/* Header: date navigation + view toggles */}
+            <div className="flex items-center justify-between mb-4 gap-2">
+              {/* Date display + prev/next (day view) or week nav (other views) */}
+              {calendarView === 'day' ? (
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setCalendarView('day')}
-                    className={clsx(
-                      "p-2 rounded-lg transition-all",
-                      calendarView === 'day' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600"
-                    )}
-                    title="Visualização por Dia"
+                    onClick={() => {
+                      const prev = addDays(selectedDate, -1);
+                      setSelectedDate(prev);
+                      if (!weekDays.some(d => isSameDay(d, prev))) setCurrentDate(prev);
+                    }}
+                    className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all"
                   >
-                    <CalendarDays className="w-5 h-5" />
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
+                  <div className="text-center min-w-[160px]">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 capitalize">
+                      {format(selectedDate, 'EEEE', { locale: ptBR })}
+                    </p>
+                    <p className="text-lg font-black text-zinc-900 leading-tight capitalize">
+                      {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+                    </p>
+                  </div>
                   <button
-                    onClick={() => setCalendarView('week')}
-                    className={clsx(
-                      "p-2 rounded-lg transition-all",
-                      calendarView === 'week' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600"
-                    )}
-                    title="Visualização Semanal"
+                    onClick={() => {
+                      const next = addDays(selectedDate, 1);
+                      const canAdvance = isBookingOpen(next) || profile?.role === 'admin';
+                      if (!canAdvance) return;
+                      setSelectedDate(next);
+                      if (!weekDays.some(d => isSameDay(d, next))) setCurrentDate(next);
+                    }}
+                    className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all"
                   >
-                    <LayoutGrid className="w-5 h-5" />
+                    <ChevronRight className="w-5 h-5" />
                   </button>
-                  <button
-                    onClick={() => setCalendarView('list')}
-                    className={clsx(
-                      "p-2 rounded-lg transition-all",
-                      calendarView === 'list' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600"
-                    )}
-                    title="Visualização em Lista"
-                  >
-                    <List className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setCurrentDate(addDays(currentDate, -7))}
-                  className="px-3 py-1.5 text-sm font-medium text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 shadow-sm"
-                >
-                  Anterior
-                </button>
-                <button 
-                  onClick={() => setCurrentDate(addDays(currentDate, 7))}
-                  disabled={!isBookingOpen(addDays(startOfCurrentWeek, 7)) && profile?.role !== 'admin'}
-                  className={clsx(
-                    "px-3 py-1.5 text-sm font-medium rounded-lg shadow-sm transition-all",
-                    (!isBookingOpen(addDays(startOfCurrentWeek, 7)) && profile?.role !== 'admin')
-                      ? "bg-zinc-100 text-zinc-300 cursor-not-allowed"
-                      : "text-zinc-600 bg-white border border-zinc-200 hover:bg-zinc-50"
+                  {!isSameDay(selectedDate, new Date()) && (
+                    <button
+                      onClick={() => { setSelectedDate(new Date()); setCurrentDate(new Date()); }}
+                      className="ml-1 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 transition-all"
+                    >
+                      Hoje
+                    </button>
                   )}
-                >
-                  Próxima
-                </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-black text-zinc-800 capitalize">
+                    {format(startOfCurrentWeek, "MMMM yyyy", { locale: ptBR })}
+                  </h2>
+                  <div className="flex gap-1">
+                    <button onClick={() => setCurrentDate(addDays(currentDate, -7))}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentDate(addDays(currentDate, 7))}
+                      disabled={!isBookingOpen(addDays(startOfCurrentWeek, 7)) && profile?.role !== 'admin'}
+                      className={clsx("p-1.5 rounded-lg transition-all",
+                        (!isBookingOpen(addDays(startOfCurrentWeek, 7)) && profile?.role !== 'admin')
+                          ? "text-zinc-200 cursor-not-allowed"
+                          : "text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+                      )}>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* View toggles */}
+              <div className="flex gap-1 bg-zinc-100 p-1 rounded-xl shrink-0">
+                <button onClick={() => setCalendarView('day')}
+                  className={clsx("p-2 rounded-lg transition-all", calendarView === 'day' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                  title="Por Dia"><CalendarDays className="w-4 h-4" /></button>
+                <button onClick={() => setCalendarView('week')}
+                  className={clsx("p-2 rounded-lg transition-all", calendarView === 'week' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                  title="Semana"><LayoutGrid className="w-4 h-4" /></button>
+                <button onClick={() => setCalendarView('list')}
+                  className={clsx("p-2 rounded-lg transition-all", calendarView === 'list' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                  title="Lista"><List className="w-4 h-4" /></button>
               </div>
             </div>
 
             {/* Calendar Content based on View */}
             {calendarView === 'day' ? (
               <>
-                {/* Day Tabs */}
-                <div className="flex overflow-x-auto gap-3 pb-4 mb-6 hide-scrollbar">
-                  {weekDays.map(day => (
-                    <button
-                      key={day.toISOString()}
-                      onClick={() => setSelectedDate(day)}
-                      className={clsx(
-                        "flex flex-col items-center min-w-[80px] p-3 rounded-2xl border-2 transition-all shrink-0",
-                        isSameDay(selectedDate, day)
-                          ? "bg-emerald-600 border-emerald-600 text-white shadow-md transform scale-105"
-                          : "bg-white border-zinc-100 text-zinc-500 hover:border-emerald-200"
-                      )}
-                    >
-                      <span className="text-xs font-semibold uppercase tracking-wider">{format(day, 'EEE', { locale: ptBR })}</span>
-                      <span className="text-2xl font-bold mt-1">{format(day, 'dd')}</span>
-                    </button>
-                  ))}
+                {/* Day strip */}
+                <div ref={dayTabsRef} className="flex overflow-x-auto gap-2 pb-2 mb-5 hide-scrollbar">
+                  {weekDays.map(day => {
+                    const isSelected = isSameDay(selectedDate, day);
+                    const isToday = isSameDay(day, new Date());
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        onClick={() => setSelectedDate(day)}
+                        className={clsx(
+                          "flex flex-col items-center min-w-[52px] py-2 px-1 rounded-2xl transition-all shrink-0",
+                          isSelected
+                            ? "bg-emerald-600 text-white shadow-md"
+                            : "bg-white text-zinc-500 hover:bg-emerald-50 hover:text-emerald-700"
+                        )}
+                      >
+                        <span className="text-[9px] font-black uppercase tracking-widest">{format(day, 'EEE', { locale: ptBR })}</span>
+                        <span className={clsx("text-xl font-black mt-0.5", isSelected ? "text-white" : "text-zinc-800")}>{format(day, 'dd')}</span>
+                        <span className={clsx("w-1.5 h-1.5 rounded-full mt-1", isToday ? (isSelected ? "bg-white/70" : "bg-emerald-500") : "bg-transparent")} />
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Slots List */}
-                <div className="space-y-4">
-                  {getAvailableSlots(selectedDate).map(startTime => {
+                {/* Swipeable slots area */}
+                <div
+                  className="space-y-3"
+                  onTouchStart={(e) => { swipeTouchStartXRef.current = e.touches[0].clientX; }}
+                  onTouchEnd={(e) => {
+                    if (swipeTouchStartXRef.current === null) return;
+                    const delta = e.changedTouches[0].clientX - swipeTouchStartXRef.current;
+                    swipeTouchStartXRef.current = null;
+                    if (Math.abs(delta) < 50) return;
+                    const next = addDays(selectedDate, delta < 0 ? 1 : -1);
+                    if (delta < 0 && !isBookingOpen(next) && profile?.role !== 'admin') return;
+                    setSelectedDate(next);
+                    if (!weekDays.some(d => isSameDay(d, next))) setCurrentDate(next);
+                  }}
+                >
+                  {getAvailableSlots(selectedDate).length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-zinc-100 p-8 text-center text-zinc-400">
+                      <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="font-bold text-sm">Sem horários disponíveis</p>
+                    </div>
+                  ) : getAvailableSlots(selectedDate).map(startTime => {
                     const isDoubles = isDoublesOnly(selectedDate, startTime);
                     return (
-                      <div key={startTime} className="bg-white rounded-2xl border border-zinc-100 p-4 shadow-sm flex flex-col sm:flex-row gap-4">
-                        <div className="flex items-center sm:justify-center sm:w-28 sm:border-r border-zinc-100">
-                          <div className="flex items-center gap-2 text-zinc-800">
-                            <Clock className="w-5 h-5 text-emerald-600" />
-                            <span className="text-xl font-bold">{startTime}</span>
-                          </div>
+                      <div key={startTime} className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-50 border-b border-zinc-100">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-sm font-black text-zinc-800">{startTime}</span>
+                          {isDoubles && (
+                            <span className="ml-auto text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">
+                              Duplas
+                            </span>
+                          )}
                         </div>
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {renderCourtSlot('court1', selectedDate, startTime, isDoubles)}
-                          {renderCourtSlot('court2', selectedDate, startTime, isDoubles)}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-zinc-100">
+                          <div className="bg-white p-3">{renderCourtSlot('court1', selectedDate, startTime, isDoubles)}</div>
+                          <div className="bg-white p-3">{renderCourtSlot('court2', selectedDate, startTime, isDoubles)}</div>
                         </div>
                       </div>
                     );
