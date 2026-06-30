@@ -1460,204 +1460,154 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-20 md:hidden"
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* ── Sidebar ── */}
       <aside className={clsx(
-        "fixed inset-y-0 left-0 z-30 w-60 bg-white border-r border-zinc-100 flex flex-col transition-transform duration-300 md:translate-x-0",
+        "fixed inset-y-0 left-0 z-30 w-[84px] bg-zinc-900 flex flex-col transition-transform duration-300 md:translate-x-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        {/* Brand */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-100">
-          <div className="flex items-center gap-2.5">
-            {globalSettings?.logoUrl ? (
-              <img src={globalSettings.logoUrl} alt="Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shrink-0">
-                <Trophy className="w-4 h-4 text-white" />
-              </div>
-            )}
-            <span className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">
-              {globalSettings?.clubName || 'Tennis FFC'}
-            </span>
-          </div>
-          <button
-            className="md:hidden p-1.5 text-zinc-400 hover:text-zinc-600 rounded-lg"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+        {/* Logo */}
+        <div className="flex flex-col items-center pt-4 pb-3 border-b border-white/10">
+          {globalSettings?.logoUrl ? (
+            <img src={globalSettings.logoUrl} alt="Logo" className="w-11 h-11 object-contain rounded-xl" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-11 h-11 bg-emerald-600 rounded-xl flex items-center justify-center">
+              <Trophy className="w-6 h-6 text-white" />
+            </div>
+          )}
         </div>
 
-        {/* Credits card */}
-        <div className="px-4 py-3 border-b border-zinc-100">
-          <div className="bg-emerald-600 rounded-2xl px-4 py-3 text-white">
-            <p className="text-[9px] font-black uppercase tracking-widest opacity-75 mb-0.5">Créditos da Semana</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black">
-                {(profile?.role === 'admin' || profile?.role === 'professor') ? '∞' : (profile?.credits || 0)}
-              </span>
-              {!(profile?.role === 'admin' || profile?.role === 'professor') && (
-                <span className="text-base opacity-60">/ 3</span>
-              )}
-            </div>
+        {/* Credits badge */}
+        <div className="px-3 py-3 border-b border-white/10">
+          <div className="bg-emerald-600 rounded-xl flex flex-col items-center py-2">
+            <span className="text-[8px] font-black text-white/60 uppercase tracking-widest">Créditos</span>
+            <span className="text-xl font-black text-white leading-none">
+              {(profile?.role === 'admin' || profile?.role === 'professor') ? '∞' : (profile?.credits || 0)}
+            </span>
+            {!(profile?.role === 'admin' || profile?.role === 'professor') && (
+              <span className="text-[9px] text-white/50 font-bold">/ 3</span>
+            )}
           </div>
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          <button
-            onClick={() => { setActiveTab('calendar'); setSelectedDate(new Date()); setCurrentDate(new Date()); setSidebarOpen(false); }}
-            className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'calendar' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-            )}
-          >
-            <CalendarDays className="w-4 h-4 shrink-0" />
-            Agenda
-          </button>
-          <button
-            onClick={() => { setActiveTab('my-bookings'); setSidebarOpen(false); }}
-            className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'my-bookings' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-            )}
-          >
-            <CalendarCheck className="w-4 h-4 shrink-0" />
-            Meus Agendamentos
-          </button>
-          <button
-            onClick={() => { setActiveTab('championships'); setSidebarOpen(false); }}
-            className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'championships' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-            )}
-          >
-            <Trophy className="w-4 h-4 shrink-0" />
-            Campeonatos
-          </button>
-          <button
-            onClick={() => { setActiveTab('free-slots'); setSidebarOpen(false); }}
-            className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'free-slots' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-            )}
-          >
-            <LayoutGrid className="w-4 h-4 shrink-0" />
-            Vagas Livres
-          </button>
-          <button
-            onClick={() => { setActiveTab('maintenance-report'); setSidebarOpen(false); }}
-            className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'maintenance-report' ? "bg-amber-500 text-white" : "text-amber-600 hover:bg-amber-50"
-            )}
-          >
-            <Wrench className="w-4 h-4 shrink-0" />
-            Central de Relatos
-          </button>
-          <button
-            onClick={() => { setActiveTab('rules'); setSidebarOpen(false); }}
-            className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'rules' ? "bg-zinc-100 text-zinc-900" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-            )}
-          >
-            <FileText className="w-4 h-4 shrink-0" />
-            Regras do Clube
-          </button>
+        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
+          {[
+            { tab: 'calendar' as const, icon: <CalendarDays className="w-5 h-5" />, label: 'Agenda', onClick: () => { setActiveTab('calendar'); setSelectedDate(new Date()); setCurrentDate(new Date()); setSidebarOpen(false); }, activeColor: 'bg-emerald-600 text-white' },
+            { tab: 'my-bookings' as const, icon: <CalendarCheck className="w-5 h-5" />, label: 'Bookings', onClick: () => { setActiveTab('my-bookings'); setSidebarOpen(false); }, activeColor: 'bg-emerald-600 text-white' },
+            { tab: 'championships' as const, icon: <Trophy className="w-5 h-5" />, label: 'Campeon.', onClick: () => { setActiveTab('championships'); setSidebarOpen(false); }, activeColor: 'bg-emerald-600 text-white' },
+            { tab: 'free-slots' as const, icon: <LayoutGrid className="w-5 h-5" />, label: 'Vagas', onClick: () => { setActiveTab('free-slots'); setSidebarOpen(false); }, activeColor: 'bg-emerald-600 text-white' },
+            { tab: 'maintenance-report' as const, icon: <Wrench className="w-5 h-5" />, label: 'Relatos', onClick: () => { setActiveTab('maintenance-report'); setSidebarOpen(false); }, activeColor: 'bg-amber-500 text-white' },
+            { tab: 'rules' as const, icon: <FileText className="w-5 h-5" />, label: 'Regras', onClick: () => { setActiveTab('rules'); setSidebarOpen(false); }, activeColor: 'bg-white/15 text-white' },
+          ].map(({ tab, icon, label, onClick, activeColor }) => (
+            <button
+              key={tab}
+              onClick={onClick}
+              className={clsx(
+                "w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center",
+                activeTab === tab ? activeColor : "text-zinc-400 hover:bg-white/10 hover:text-white"
+              )}
+            >
+              {icon}
+              <span>{label}</span>
+            </button>
+          ))}
 
           {profile?.role === 'admin' && (
             <>
-              <div className="pt-4 pb-1 px-3">
-                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Administração</p>
+              <div className="pt-3 pb-1 flex items-center justify-center">
+                <div className="h-px w-8 bg-white/10" />
               </div>
-              <button
-                onClick={() => { setActiveTab('ranking'); setSidebarOpen(false); }}
-                className={clsx(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-                  activeTab === 'ranking' ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                )}
-              >
-                <List className="w-4 h-4 shrink-0" />
-                Ranking
-              </button>
-              <button
-                onClick={() => { setActiveTab('admin-professors'); setSidebarOpen(false); }}
-                className={clsx(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-                  activeTab === 'admin-professors' ? "bg-zinc-900 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                )}
-              >
-                <UserCheck className="w-4 h-4 shrink-0" />
-                Profissionais
-              </button>
+              {[
+                { tab: 'ranking' as const, icon: <List className="w-5 h-5" />, label: 'Ranking', onClick: () => { setActiveTab('ranking'); setSidebarOpen(false); } },
+                { tab: 'admin-professors' as const, icon: <UserCheck className="w-5 h-5" />, label: 'Profiss.', onClick: () => { setActiveTab('admin-professors'); setSidebarOpen(false); } },
+              ].map(({ tab, icon, label, onClick }) => (
+                <button
+                  key={tab}
+                  onClick={onClick}
+                  className={clsx(
+                    "w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center",
+                    activeTab === tab ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  {icon}
+                  <span>{label}</span>
+                </button>
+              ))}
               <button
                 onClick={() => navigate('/admin')}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-white/10 hover:text-white"
               >
-                <Shield className="w-4 h-4 shrink-0" />
-                Painel Admin
+                <Shield className="w-5 h-5" />
+                <span>Admin</span>
               </button>
             </>
           )}
           {(profile?.role !== 'admin' && profile?.canManageChampionships) && (
             <button
               onClick={() => navigate('/admin')}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+              className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-white/10 hover:text-white"
             >
-              <Shield className="w-4 h-4 shrink-0" />
-              Gerenciar
+              <Shield className="w-5 h-5" />
+              <span>Gerenciar</span>
             </button>
           )}
           {profile?.role === 'professor' && (
             <button
               onClick={() => { setActiveTab('professor'); setSidebarOpen(false); }}
               className={clsx(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-                activeTab === 'professor' ? "bg-emerald-600 text-white" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                "w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center",
+                activeTab === 'professor' ? "bg-emerald-600 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-white"
               )}
             >
-              <GraduationCap className="w-4 h-4 shrink-0" />
-              Painel Professor
+              <GraduationCap className="w-5 h-5" />
+              <span>Professor</span>
             </button>
           )}
         </nav>
 
         {/* Bottom: profile + logout */}
-        <div className="border-t border-zinc-100 p-3 space-y-0.5">
+        <div className="border-t border-white/10 px-2 py-2 space-y-0.5">
           <button
             onClick={() => { setActiveTab('profile'); setSidebarOpen(false); }}
             className={clsx(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left",
-              activeTab === 'profile' ? "bg-zinc-100 text-zinc-900" : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+              "w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center",
+              activeTab === 'profile' ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-white"
             )}
           >
-            <UserIcon className="w-4 h-4 shrink-0" />
-            Meu Perfil
+            <UserIcon className="w-5 h-5" />
+            <span>Perfil</span>
           </button>
           <button
             onClick={() => { logout(); navigate('/login'); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-left text-zinc-500 hover:bg-red-50 hover:text-red-600"
+            className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-red-500/20 hover:text-red-400"
           >
-            <LogOut className="w-4 h-4 shrink-0" />
-            Sair
+            <LogOut className="w-5 h-5" />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
 
       {/* ── Main content area (offset by sidebar on md+) ── */}
-      <div className="flex-1 flex flex-col min-h-screen md:ml-60">
+      <div className="flex-1 flex flex-col min-h-screen md:ml-[84px]">
       <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-black uppercase tracking-tighter text-zinc-900 flex items-center gap-2 italic">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
+          <button
+            className="md:hidden p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-100 rounded-xl shrink-0"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl font-black uppercase tracking-tighter text-zinc-900 flex items-center gap-2 italic flex-1">
             {globalSettings?.logoUrl ? (
-              <img src={globalSettings.logoUrl} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+              <img src={globalSettings.logoUrl} alt="Logo" className="w-10 h-10 object-contain hidden md:block" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-emerald-600 rounded-lg items-center justify-center hidden md:flex">
                 <Trophy className="w-5 h-5 text-white" />
               </div>
             )}
@@ -1670,7 +1620,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
             </span>
           </h1>
           <div className="flex items-center gap-2 sm:gap-3">
-            <button 
+            <button
               onClick={forceSync}
               disabled={isSyncing}
               className={clsx(
@@ -1683,13 +1633,6 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                 {isSyncing ? 'Sincronizando...' : 'Sincronizado'}
               </span>
               <RefreshCw className={clsx("w-3 h-3", isSyncing && "animate-spin")} />
-            </button>
-            <button
-              className="md:hidden p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-100 rounded-xl"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Abrir menu"
-            >
-              <Menu className="w-5 h-5" />
             </button>
           </div>
         </div>
