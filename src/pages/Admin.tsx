@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { UserProfile, Booking, Championship, ChampionshipRegistration, ChampionshipMatch } from '../types';
 import { format, addDays, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Shield, Users, Calendar as CalendarIcon, AlertTriangle, Download, Trophy, ArrowRight, Trash2, FileText, Bell, CheckCircle, Plus, X, ShieldAlert, AlertCircle, Settings } from 'lucide-react';
+import { Shield, Users, Calendar as CalendarIcon, AlertTriangle, Download, Trophy, ArrowRight, ArrowLeft, Trash2, FileText, Bell, CheckCircle, Plus, X, ShieldAlert, AlertCircle, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
@@ -1191,34 +1191,37 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-zinc-900 flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center gap-2">
+          <h1 className="text-lg sm:text-xl font-bold text-zinc-900 flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             {globalSettings?.logoUrl ? (
-              <img src={globalSettings.logoUrl} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+              <img src={globalSettings.logoUrl} alt="Logo" className="w-9 h-9 sm:w-10 sm:h-10 object-contain shrink-0" referrerPolicy="no-referrer" />
             ) : (
-              <Shield className="w-6 h-6 text-emerald-600" />
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 shrink-0" />
             )}
-            <span className="flex flex-col">
-              <span className="text-xs text-zinc-400 uppercase tracking-widest font-black leading-none mb-1">
+            <span className="flex flex-col min-w-0">
+              <span className="text-[9px] sm:text-xs text-zinc-400 uppercase tracking-widest font-black leading-none mb-1">
                 {isSystemAdmin ? 'Administração' : 'Gestão'}
               </span>
-              <span className="leading-none">
+              <span className="leading-none truncate">
                 {globalSettings?.clubName || 'Tennis FFC'}
               </span>
             </span>
           </h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
             {isSystemAdmin && (
-              <button 
+              <button
                 onClick={handleDownloadProject}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors whitespace-nowrap"
               >
-                <Download className="w-4 h-4" />
-                Exportar Dados (ZIP)
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">Exportar Dados (ZIP)</span>
+                <span className="sm:hidden">ZIP</span>
               </button>
             )}
-            <button onClick={() => navigate('/')} className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
-              Voltar ao Dashboard
+            <button onClick={() => navigate('/')} className="flex items-center gap-1 text-xs sm:text-sm font-medium text-emerald-600 hover:text-emerald-700 whitespace-nowrap">
+              <ArrowLeft className="w-3.5 h-3.5 sm:hidden shrink-0" />
+              <span className="hidden sm:inline">Voltar ao Dashboard</span>
+              <span className="sm:hidden">Voltar</span>
             </button>
           </div>
         </div>
@@ -2066,8 +2069,8 @@ export default function Admin() {
       </Modal>
 
       {blockingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">Bloquear {blockingUser.fullName}</h3>
             <p className="text-sm text-zinc-600 mb-6">
               Selecione o período de bloqueio para este sócio. Durante este tempo, ele não poderá realizar novos agendamentos.
@@ -2097,8 +2100,8 @@ export default function Admin() {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">Editar Sócio</h3>
             <div className="space-y-4">
               <div>
@@ -2295,8 +2298,8 @@ export default function Admin() {
       )}
 
       {isResettingCredits && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">Resetar Todos os Créditos</h3>
             <p className="text-sm text-zinc-600 mb-6">
               Esta ação definirá os créditos de TODOS os sócios para 3. Digite a senha de segurança para continuar.
@@ -2332,8 +2335,8 @@ export default function Admin() {
       )}
 
       {isResettingBookings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">Resetar Todos os Agendamentos</h3>
             <p className="text-sm text-zinc-600 mb-6">
               Esta ação removerá permanentemente todos os agendamentos do sistema. Digite a senha de segurança para continuar.

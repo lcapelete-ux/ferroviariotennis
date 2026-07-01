@@ -52,9 +52,9 @@ export default function Modal({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="p-6">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 my-8 max-h-[calc(100vh-4rem)] flex flex-col">
+        <div className="p-6 overflow-y-auto">
           <div className="flex items-start justify-between mb-4">
             <div className={clsx("p-3 rounded-xl", colors[type])}>
               {icons[type]}
@@ -63,13 +63,13 @@ export default function Modal({
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           <h3 className="text-xl font-bold text-zinc-900 mb-2">{title}</h3>
           <p className="text-zinc-600 leading-relaxed whitespace-pre-wrap">{message}</p>
           {children && <div className="mt-4">{children}</div>}
         </div>
-        
-        <div className="bg-zinc-50 p-4 flex flex-wrap gap-3 justify-end">
+
+        <div className="bg-zinc-50 p-4 flex flex-wrap gap-3 justify-end shrink-0">
           {type === 'confirm' ? (
             <>
               <button

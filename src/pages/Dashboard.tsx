@@ -1494,10 +1494,13 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
       )}
 
       {/* ── Sidebar ── */}
-      <aside className={clsx(
-        "fixed inset-y-0 left-0 z-30 w-[84px] bg-zinc-900 flex flex-col transition-transform duration-300 md:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <aside
+        className={clsx(
+          "fixed inset-y-0 left-0 z-30 w-[84px] bg-zinc-900 flex flex-col transition-transform duration-300 md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         {/* Logo */}
         <div className="flex flex-col items-center pt-4 pb-3 border-b border-white/10">
           {globalSettings?.logoUrl ? (
@@ -1622,7 +1625,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
 
       {/* ── Main content area (offset by sidebar on md+) ── */}
       <div className="flex-1 flex flex-col min-h-screen md:ml-[84px]">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      <header className="bg-white shadow-sm sticky top-0 z-10" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
           <button
             className="md:hidden p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-100 rounded-xl shrink-0"
@@ -1815,25 +1818,25 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
             )}
 
             {/* Header: date navigation + view toggles */}
-            <div className="flex items-center justify-between mb-4 gap-2">
+            <div className="flex items-center justify-between mb-4 gap-1.5 flex-wrap">
               {/* Date display + prev/next (day view) or week nav (other views) */}
               {calendarView === 'day' ? (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <button
                     onClick={() => {
                       const prev = addDays(selectedDate, -1);
                       setSelectedDate(prev);
                       if (!weekDays.some(d => isSameDay(d, prev))) setCurrentDate(prev);
                     }}
-                    className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all"
+                    className="p-1.5 sm:p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all shrink-0"
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
-                  <div className="text-center min-w-[160px]">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 capitalize">
+                  <div className="text-center min-w-[104px] sm:min-w-[160px] px-0.5">
+                    <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wide sm:tracking-widest text-zinc-400 capitalize truncate">
                       {format(selectedDate, 'EEEE', { locale: ptBR })}
                     </p>
-                    <p className="text-lg font-black text-zinc-900 leading-tight capitalize">
+                    <p className="text-sm sm:text-lg font-black text-zinc-900 leading-tight capitalize whitespace-nowrap">
                       {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
                     </p>
                   </div>
@@ -1845,22 +1848,22 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                       setSelectedDate(next);
                       if (!weekDays.some(d => isSameDay(d, next))) setCurrentDate(next);
                     }}
-                    className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all"
+                    className="p-1.5 sm:p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-all shrink-0"
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                   {!isSameDay(selectedDate, new Date()) && (
                     <button
                       onClick={() => { setSelectedDate(new Date()); setCurrentDate(new Date()); }}
-                      className="ml-1 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 transition-all"
+                      className="ml-0.5 px-2 sm:px-2.5 py-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 transition-all shrink-0"
                     >
                       Hoje
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-black text-zinc-800 capitalize">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <h2 className="text-base sm:text-lg font-black text-zinc-800 capitalize">
                     {format(startOfCurrentWeek, "MMMM yyyy", { locale: ptBR })}
                   </h2>
                   <div className="flex gap-1">
@@ -1883,16 +1886,16 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
               )}
 
               {/* View toggles */}
-              <div className="flex gap-1 bg-zinc-100 p-1 rounded-xl shrink-0">
+              <div className="flex gap-0.5 bg-zinc-100 p-1 rounded-xl shrink-0">
                 <button onClick={() => setCalendarView('day')}
-                  className={clsx("p-2 rounded-lg transition-all", calendarView === 'day' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
-                  title="Por Dia"><CalendarDays className="w-4 h-4" /></button>
+                  className={clsx("p-1.5 sm:p-2 rounded-lg transition-all", calendarView === 'day' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                  title="Por Dia"><CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
                 <button onClick={() => setCalendarView('week')}
-                  className={clsx("p-2 rounded-lg transition-all", calendarView === 'week' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
-                  title="Semana"><LayoutGrid className="w-4 h-4" /></button>
+                  className={clsx("p-1.5 sm:p-2 rounded-lg transition-all", calendarView === 'week' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                  title="Semana"><LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
                 <button onClick={() => setCalendarView('list')}
-                  className={clsx("p-2 rounded-lg transition-all", calendarView === 'list' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
-                  title="Lista"><List className="w-4 h-4" /></button>
+                  className={clsx("p-1.5 sm:p-2 rounded-lg transition-all", calendarView === 'list' ? "bg-white text-emerald-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                  title="Lista"><List className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
               </div>
             </div>
 
@@ -3179,8 +3182,8 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
       </main>
 
       {isRegistering && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md p-8 border border-zinc-100">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md p-8 border border-zinc-100 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black text-zinc-900">Inscrição</h3>
               <button onClick={() => setIsRegistering(null)} className="text-zinc-400 hover:text-zinc-600">
