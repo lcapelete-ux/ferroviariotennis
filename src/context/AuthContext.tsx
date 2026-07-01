@@ -24,6 +24,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let unsubProfile: (() => void) | null = null;
 
+    // Failsafe: never let the app hang on the loading screen if Firebase/Firestore
+    // is slow or unreachable. After 8s we stop blocking and render with whatever
+    // auth state we have (routes fall back to the public pages when profile is null).
+    const loadingTimeout = setTimeout(() => {
+      console.warn('[AuthContext] Auth/profile timeout — proceeding without blocking.');
+      setLoading(false);
+    }, 8000);
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       try {
         setError(null);
@@ -103,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
+      clearTimeout(loadingTimeout);
       unsubscribe();
       if (unsubProfile) unsubProfile();
     };

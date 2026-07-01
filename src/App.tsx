@@ -121,17 +121,16 @@ const AppContent = () => {
 
   const appLoading = !minTimerDone;
 
+  // The PreLoader keeps its smooth fade-out (via AnimatePresence), but the app
+  // content is a plain div so its visibility never depends on an animation
+  // running — a stuck opacity animation must not leave a blank screen.
   return (
-    <AnimatePresence mode="wait">
-      {appLoading ? (
-        <PreLoader key="loader" />
-      ) : (
-        <motion.div
-          key="content"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-        >
+    <>
+      <AnimatePresence>
+        {appLoading && <PreLoader key="loader" />}
+      </AnimatePresence>
+      {!appLoading && (
+        <div>
           <GlobalError />
           <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <FooterAware>
@@ -146,9 +145,9 @@ const AppContent = () => {
               </Routes>
             </FooterAware>
           </Router>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 };
 
