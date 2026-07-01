@@ -1328,9 +1328,14 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                 </span>
               </div>
             </div>
-            <div className="font-semibold text-zinc-900 truncate">
-              {slotBooking.userName}
-              {slotBooking.opponentName && <span className="text-zinc-500 font-normal"> vs {slotBooking.opponentName}</span>}
+            <div className="font-semibold text-zinc-900 leading-snug min-w-0">
+              <span className="block truncate">{slotBooking.userName}</span>
+              {slotBooking.opponentName && (
+                <span className="flex items-center gap-1 text-zinc-500 font-normal min-w-0">
+                  <span className="text-[9px] font-black text-zinc-400 uppercase shrink-0">vs</span>
+                  <span className="truncate">{slotBooking.opponentName}</span>
+                </span>
+              )}
             </div>
             {slotBooking.professorName && (
               <div className="text-[10px] text-zinc-500 mt-0.5 truncate font-medium">
