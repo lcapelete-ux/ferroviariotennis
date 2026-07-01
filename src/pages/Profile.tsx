@@ -363,22 +363,22 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                 ) : (
                   <ul className="divide-y divide-zinc-200">
                     {myBookings.map(booking => (
-                      <li key={booking.id} className="py-4 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-zinc-900">
-                            {booking.isFixed 
+                      <li key={booking.id} className="py-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-zinc-900 truncate">
+                            {booking.isFixed
                               ? `Toda ${format(addDays(new Date(2024, 0, 7), booking.dayOfWeek || 0), 'EEEE', { locale: ptBR })}`
                               : format(parseISO(booking.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                           </p>
-                          <p className="text-sm text-zinc-500">
+                          <p className="text-sm text-zinc-500 truncate">
                             Das {booking.startTime} às {booking.endTime} - {booking.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2'}
                           </p>
-                          <p className="text-xs text-zinc-400 mt-1">
+                          <p className="text-xs text-zinc-400 mt-1 truncate">
                             Tipo: {booking.type === 'double' ? 'Duplas' : booking.type === 'lesson' ? 'Aula Fixa' : 'Simples'}
                             {booking.professorName && ` • Prof: ${booking.professorName}`}
                           </p>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="flex flex-col items-end gap-2 shrink-0">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             booking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
                             booking.status === 'cancelled' ? 'bg-zinc-100 text-zinc-800' :

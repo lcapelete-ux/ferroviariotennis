@@ -1558,9 +1558,9 @@ export default function Admin() {
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
               <ul className="divide-y divide-zinc-200">
                 {filteredBookings.map(booking => (
-                <li key={booking.id} className="px-6 py-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-zinc-900">
+                <li key={booking.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-medium text-zinc-900 truncate">
                       {booking.userName} - {booking.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2'}
                       {booking.professorName && <span className="ml-2 text-xs text-zinc-500 font-normal">(Prof: {booking.professorName})</span>}
                       {booking.isLastMinute && (
@@ -1570,7 +1570,7 @@ export default function Admin() {
                       )}
                     </h3>
                     <p className="text-sm text-zinc-500">
-                      {booking.isFixed 
+                      {booking.isFixed
                         ? `Toda ${format(addDays(new Date(2024, 0, 7), booking.dayOfWeek || 0), 'EEEE', { locale: ptBR })}`
                         : format(parseISO(booking.date), 'dd/MM/yyyy')} das {booking.startTime} às {booking.endTime}
                     </p>
@@ -1582,13 +1582,13 @@ export default function Admin() {
                       {booking.status === 'confirmed' ? 'Ativo' : booking.status === 'cancelled' ? 'Cancelado' : 'No-Show'}
                     </span>
                     {booking.observation && (
-                      <p className="text-xs text-amber-600 font-medium italic mt-1">
+                      <p className="text-xs text-amber-600 font-medium italic mt-1 truncate">
                         Obs: {booking.observation}
                       </p>
                     )}
                   </div>
                   {booking.status === 'confirmed' && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 shrink-0">
                       <button
                         onClick={() => handleCancelBooking(booking.id)}
                         className="px-3 py-1 text-xs font-medium text-zinc-700 bg-zinc-100 rounded hover:bg-zinc-200"
@@ -1627,15 +1627,15 @@ export default function Admin() {
                 <li className="px-6 py-12 text-center text-zinc-500 text-sm">Nenhuma denúncia ou alerta registrado.</li>
               ) : (
                 alerts.map(alert => (
-                  <li key={alert.id} className={`px-6 py-4 flex items-center justify-between ${!alert.read ? 'bg-amber-50/50' : ''}`}>
-                    <div className="flex gap-4 items-start">
-                      <div className={`p-2 rounded-full ${!alert.read ? 'bg-amber-100 text-amber-600' : 'bg-zinc-100 text-zinc-400'}`}>
+                  <li key={alert.id} className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${!alert.read ? 'bg-amber-50/50' : ''}`}>
+                    <div className="flex gap-4 items-start min-w-0 flex-1">
+                      <div className={`p-2 rounded-full shrink-0 ${!alert.read ? 'bg-amber-100 text-amber-600' : 'bg-zinc-100 text-zinc-400'}`}>
                         <AlertTriangle className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         {alert.type === 'late_cancellation_attempt' ? (
                           <>
-                            <h4 className="text-sm font-bold text-zinc-900">{alert.userName}</h4>
+                            <h4 className="text-sm font-bold text-zinc-900 truncate">{alert.userName}</h4>
                             <p className="text-xs text-zinc-500">Tentou cancelar o agendamento de {format(parseISO(alert.bookingDate), 'dd/MM')} às {alert.bookingTime}</p>
                           </>
                         ) : (
@@ -1649,11 +1649,11 @@ export default function Admin() {
                         <p className="text-[10px] text-zinc-400 mt-1">Registrado em: {format(alert.created_at ? new Date(alert.created_at) : new Date(), 'dd/MM HH:mm')}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center flex-wrap gap-2 shrink-0">
                       {!alert.read && (
                         <button
                           onClick={() => handleMarkAlertRead(alert.id)}
-                          className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100"
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 whitespace-nowrap"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Marcar Lido
@@ -1664,14 +1664,14 @@ export default function Admin() {
                           const user = users.find(u => u.uid === alert.userId);
                           if (user) setBlockingUser(user);
                         }}
-                        className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
+                        className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 whitespace-nowrap"
                       >
                         <ShieldAlert className="w-4 h-4" />
                         Punir Sócio
                       </button>
                       <button
                         onClick={() => handleDeleteAlert(alert.id)}
-                        className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                         title="Excluir Alerta"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1695,21 +1695,21 @@ export default function Admin() {
                 <li className="px-6 py-12 text-center text-zinc-500 text-sm">Nenhum relato de manutenção registrado.</li>
               ) : (
                 maintenanceReports.map(report => (
-                  <li key={report.id} className={`px-6 py-4 flex items-center justify-between ${!report.read ? 'bg-blue-50/50' : ''}`}>
-                    <div className="flex gap-4 items-start flex-1 mr-4">
-                      <div className={`p-2 rounded-full ${!report.read ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-400'}`}>
+                  <li key={report.id} className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${!report.read ? 'bg-blue-50/50' : ''}`}>
+                    <div className="flex gap-4 items-start flex-1 min-w-0 mr-4">
+                      <div className={`p-2 rounded-full shrink-0 ${!report.read ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-400'}`}>
                         <Bell className="w-5 h-5" />
                       </div>
-                      <div>
-                        <p className="text-sm text-zinc-900 font-medium leading-relaxed">{report.message}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm text-zinc-900 font-medium leading-relaxed break-words">{report.message}</p>
                         <p className="text-[10px] text-zinc-400 mt-1">Enviado em: {format(new Date(report.created_at), 'dd/MM/yyyy HH:mm')}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {!report.read && (
                         <button
                           onClick={() => handleMarkReportRead(report.id)}
-                          className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100"
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 whitespace-nowrap"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Marcar Lido
@@ -1717,7 +1717,7 @@ export default function Admin() {
                       )}
                       <button
                         onClick={() => handleDeleteReport(report.id)}
-                        className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                         title="Excluir Relato"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -2374,22 +2374,22 @@ export default function Admin() {
       {viewingBracket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl p-8 border border-zinc-100 my-8">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-zinc-900">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-3 sm:gap-4">
+              <div className="min-w-0 sm:flex-1">
+                <h3 className="text-lg sm:text-2xl font-black text-zinc-900 truncate">
                   Chaves do Campeonato: {championships.find(c => c.id === viewingBracket)?.title}
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">Gerencie os placares e acompanhe o progresso do torneio.</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3 shrink-0">
                 <button
                   onClick={() => handleResetBracket(viewingBracket)}
-                  className="px-4 py-2 text-sm font-bold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all"
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all whitespace-nowrap"
                 >
                   Resetar Chaves
                 </button>
-                <button onClick={() => setViewingBracket(null)} className="text-zinc-400 hover:text-zinc-600">
-                  <X className="w-8 h-8" />
+                <button onClick={() => setViewingBracket(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0">
+                  <X className="w-6 h-6 sm:w-8 sm:h-8" />
                 </button>
               </div>
             </div>
@@ -2639,23 +2639,24 @@ export default function Admin() {
       {viewingPayments && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl p-8 border border-zinc-100 my-8">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-zinc-900">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-3 sm:gap-4">
+              <div className="min-w-0 sm:flex-1">
+                <h3 className="text-lg sm:text-2xl font-black text-zinc-900 truncate">
                   Gestão de Pagamentos: {championships.find(c => c.id === viewingPayments)?.title}
                 </h3>
                 <p className="text-sm text-zinc-500 mt-1">Confirme os pagamentos e gere relatórios financeiros.</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3 shrink-0">
                 <button
                   onClick={() => handleGenerateFinancialReport(viewingPayments)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm whitespace-nowrap"
                 >
-                  <Download className="w-5 h-5" />
-                  Relatório Financeiro
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                  <span className="hidden sm:inline">Relatório Financeiro</span>
+                  <span className="sm:hidden">Relatório</span>
                 </button>
-                <button onClick={() => setViewingPayments(null)} className="text-zinc-400 hover:text-zinc-600">
-                  <X className="w-8 h-8" />
+                <button onClick={() => setViewingPayments(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0">
+                  <X className="w-6 h-6 sm:w-8 sm:h-8" />
                 </button>
               </div>
             </div>

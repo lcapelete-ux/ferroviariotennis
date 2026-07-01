@@ -2123,23 +2123,23 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                       </div>
                       <div className="divide-y divide-zinc-50">
                         {allDayBookings.map(booking => (
-                          <div key={booking.id} className="p-4 flex items-center justify-between hover:bg-zinc-50/50 transition-colors">
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm font-black text-zinc-900 w-12">{booking.startTime}</span>
-                              <div>
-                                <p className="text-sm font-bold text-zinc-800">{booking.userName}</p>
-                                <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">
+                          <div key={booking.id} className="p-4 flex items-center justify-between gap-2 hover:bg-zinc-50/50 transition-colors">
+                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                              <span className="text-sm font-black text-zinc-900 w-12 shrink-0">{booking.startTime}</span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-zinc-800 truncate">{booking.userName}</p>
+                                <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider truncate">
                                   {booking.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2'} • {booking.type === 'lesson' ? 'Aula' : booking.type === 'double' ? 'Duplas' : 'Simples'}
                                 </p>
                                 {booking.observation && (
-                                  <p className="text-[10px] text-amber-600 font-medium italic mt-0.5">
+                                  <p className="text-[10px] text-amber-600 font-medium italic mt-0.5 truncate">
                                     Obs: {booking.observation}
                                   </p>
                                 )}
                               </div>
                             </div>
                             {(booking.userId === profile?.uid || booking.partnerId === profile?.uid) && (
-                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase">Meu</span>
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase shrink-0 whitespace-nowrap">Meu</span>
                             )}
                           </div>
                         ))}
@@ -2211,16 +2211,16 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
 
                       {booking.isVisitorGame && (
                         <div className="mt-4 p-4 rounded-2xl bg-zinc-50 border border-zinc-200">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">Visitante (Não Sócio)</span>
-                            <span className="text-sm font-black text-zinc-800">{booking.visitorName}</span>
+                          <div className="flex justify-between items-center gap-2 mb-2">
+                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest shrink-0">Visitante (Não Sócio)</span>
+                            <span className="text-sm font-black text-zinc-800 truncate min-w-0">{booking.visitorName}</span>
                           </div>
-                          
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">Status do PIX</span>
+
+                          <div className="flex justify-between items-center gap-2 mb-3">
+                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest shrink-0">Status do PIX</span>
                             <span className={clsx(
-                              "text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-widest",
-                              booking.visitorPixPaid 
+                              "text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-widest shrink-0 whitespace-nowrap",
+                              booking.visitorPixPaid
                                 ? "bg-emerald-100 text-emerald-800"
                                 : "bg-amber-100 text-amber-800"
                             )}>
@@ -2425,12 +2425,12 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
 
             <div className="bg-white rounded-3xl shadow-sm border border-zinc-200 overflow-hidden p-8">
               <div className="flex items-center gap-6 mb-8">
-                <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center">
+                <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center shrink-0">
                   <UserIcon className="w-10 h-10 text-emerald-600" />
                 </div>
-                <div>
-                  <h3 className="text-2xl font-black text-zinc-900">{profile?.fullName}</h3>
-                  <p className="text-zinc-500">{profile?.email}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-2xl font-black text-zinc-900 truncate">{profile?.fullName}</h3>
+                  <p className="text-zinc-500 truncate">{profile?.email}</p>
                   <div className="mt-2 flex gap-2">
                     <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 text-[10px] font-bold rounded-full uppercase tracking-wider">
                       {profile?.role === 'admin' ? 'Administrador' : profile?.role === 'professor' ? 'Professor' : 'Tenista'}
@@ -2738,17 +2738,17 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
 
               {professors.map(prof => (
                 <div key={prof.uid} className="bg-white rounded-3xl shadow-sm border border-zinc-200 overflow-hidden">
-                  <div className="p-6 border-b border-zinc-100 bg-zinc-50/50 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                  <div className="p-6 border-b border-zinc-100 bg-zinc-50/50 flex justify-between items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
                         <UserIcon className="w-5 h-5 text-emerald-600" />
                       </div>
-                      <div>
-                        <h3 className="font-black text-zinc-900 uppercase tracking-tight">{prof.fullName}</h3>
-                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{prof.phone || 'Sem telefone'}</p>
+                      <div className="min-w-0">
+                        <h3 className="font-black text-zinc-900 uppercase tracking-tight truncate">{prof.fullName}</h3>
+                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest truncate">{prof.phone || 'Sem telefone'}</p>
                       </div>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 shrink-0">
                       <div className="text-center">
                         <p className="text-lg font-black text-zinc-900">
                           {fixedBookings.filter(b => b.userId === prof.uid || b.professorName === prof.fullName).length}
