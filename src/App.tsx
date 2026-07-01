@@ -132,7 +132,7 @@ const AppContent = () => {
           transition={{ duration: 0.8 }}
         >
           <GlobalError />
-          <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
             <FooterAware>
               <Routes>
                 <Route path="/" element={<AuthenticatedRedirect><Landing /></AuthenticatedRedirect>} />
