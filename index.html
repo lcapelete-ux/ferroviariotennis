@@ -21,14 +21,55 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta name="theme-color" content="#059669" />
+    <meta name="theme-color" content="#011a0d" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
+    <style>
+      html, body { margin: 0; background: #011a0d; }
+      #boot {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(160deg, #011a0d 0%, #022b15 50%, #011a0d 100%);
+      }
+      #boot .ring {
+        width: 42px; height: 42px; border-radius: 9999px;
+        border: 2px solid rgba(255,255,255,0.1); border-top-color: #c8f020;
+        animation: bootspin 0.8s linear infinite;
+      }
+      @keyframes bootspin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Branded boot screen shown until React mounts (avoids a white flash). -->
+      <div id="boot"><div class="ring"></div></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Self-heal: if the app never mounts within 12s (e.g. a stale cached
+      // index.html points to an asset hash that no longer exists), clear all
+      // caches / service workers once and hard-reload. Guarded so it never loops.
+      (function () {
+        var KEY = '__ffc_selfheal__';
+        setTimeout(function () {
+          // React replaces #root's children on mount, so #boot disappears once loaded.
+          if (!document.getElementById('boot')) { sessionStorage.removeItem(KEY); return; }
+          if (sessionStorage.getItem(KEY)) return; // already retried this session
+          sessionStorage.setItem(KEY, '1');
+          try {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); });
+            }
+            if (window.caches) {
+              caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); });
+            }
+          } catch (e) {}
+          var u = new URL(window.location.href);
+          u.searchParams.set('_r', Date.now().toString());
+          setTimeout(function () { window.location.replace(u.toString()); }, 400);
+        }, 12000);
+      })();
+    </script>
   </body>
 </html>
 

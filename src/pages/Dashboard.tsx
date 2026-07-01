@@ -14,6 +14,27 @@ import { motion, AnimatePresence } from 'motion/react';
 
 import { useSettings } from '../context/SettingsContext';
 
+/**
+ * Safely format a date value (ISO string or Date). Returns `fallback` instead of
+ * throwing when the value is missing or invalid — a bad date in Firestore must
+ * never blank out the whole screen.
+ */
+const fmtDate = (
+  value: string | Date | null | undefined,
+  pattern: string,
+  options?: Parameters<typeof format>[2],
+  fallback = '—',
+): string => {
+  if (!value) return fallback;
+  try {
+    const d = typeof value === 'string' ? parseISO(value) : value;
+    if (isNaN(d.getTime())) return fallback;
+    return format(d, pattern, options);
+  } catch {
+    return fallback;
+  }
+};
+
 const TennisCourt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 150" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
     <rect x="5" y="5" width="90" height="140" stroke="currentColor" strokeWidth="2" />
@@ -528,7 +549,7 @@ ${window.location.origin}`;
         if (change.type === 'added' && Notification.permission === 'granted') {
           const n = change.doc.data() as any;
           const courtName = n.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2';
-          const dateStr = n.date ? format(parseISO(n.date), 'dd/MM') : '??';
+          const dateStr = fmtDate(n.date, 'dd/MM', undefined, '??');
           
           new Notification('Vaga Liberada! 🎾', {
             body: `${courtName} • ${dateStr} às ${n.startTime}. Toque para ver no app!`,
@@ -1067,7 +1088,7 @@ ${window.location.origin}`;
     const shareMessage = `🎾 TENNIS FFC - AVISO DE VAGA 🎾
 Uma quadra acaba de ficar disponível e você pode agendar agora!
 📍 Local: ${booking.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2'}
-📅 Data: ${booking.isFixed ? format(targetDate, 'dd/MM/yyyy') : format(parseISO(booking.date!), 'dd/MM/yyyy')}
+📅 Data: ${booking.isFixed ? fmtDate(targetDate, 'dd/MM/yyyy') : fmtDate(booking.date, 'dd/MM/yyyy')}
 ⏰ Horário: ${booking.startTime}
 👉 Agende agora pelo App: ${window.location.origin}
 Corra, pois as vagas costumam ser preenchidas rapidamente!`;
@@ -1679,7 +1700,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                     <div>
                       <p className="text-sm font-black text-amber-900 uppercase tracking-tight">Vaga Liberada! 🎾</p>
                       <p className="text-xs text-amber-700">
-                        {n.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2'} • {format(parseISO(n.date), 'dd/MM')} às {n.startTime}
+                        {n.courtId === 'court1' ? 'Quadra 1' : 'Quadra 2'} • {fmtDate(n.date, 'dd/MM', undefined, '??')} às {n.startTime}
                       </p>
                     </div>
                   </div>
@@ -2145,7 +2166,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black text-emerald-600 uppercase tracking-widest">
-                            {booking.isFixed ? 'Aula Fixa' : (booking.date ? format(parseISO(booking.date), 'dd/MM/yyyy') : 'N/A')}
+                            {booking.isFixed ? 'Aula Fixa' : fmtDate(booking.date, 'dd/MM/yyyy', undefined, 'N/A')}
                           </span>
                           {booking.isLastMinute && (
                             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 uppercase tracking-tighter">
@@ -2237,7 +2258,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                     <div key={booking.id} className="p-6 opacity-60">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                          {booking.date ? format(parseISO(booking.date), 'dd/MM/yyyy') : 'Fixo'}
+                          {fmtDate(booking.date, 'dd/MM/yyyy', undefined, 'Fixo')}
                         </span>
                         <span className={clsx(
                           "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase",
@@ -2760,7 +2781,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                             <p className="text-[10px] text-zinc-500 mt-1">
                               {booking.isFixed 
                                 ? format(addDays(new Date(2024, 0, 7), booking.dayOfWeek || 0), 'EEEE', { locale: ptBR })
-                                : (booking.date ? format(parseISO(booking.date), 'dd/MM (EEE)', { locale: ptBR }) : 'Pendente')}
+                                : fmtDate(booking.date, 'dd/MM (EEE)', { locale: ptBR }, 'Pendente')}
                               {' • '}{booking.courtId === 'court1' ? 'Q1' : 'Q2'}
                             </p>
                             {booking.observation && (
@@ -2930,7 +2951,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 text-[10px] font-black rounded-full uppercase tracking-wider">
-                            {booking.date ? format(parseISO(booking.date), 'dd/MM (EEE)', { locale: ptBR }) : 'Desconhecido'}
+                            {fmtDate(booking.date, 'dd/MM (EEE)', { locale: ptBR }, 'Desconhecido')}
                           </span>
                           <span className="text-sm font-black text-zinc-900">{booking.startTime}</span>
                         </div>
@@ -3032,7 +3053,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                         <div className="flex-1 px-3 py-2.5">
                           <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Período</p>
                           <p className="text-xs font-bold text-zinc-700">
-                            {format(parseISO(champ.startDate), 'dd/MM')} – {format(parseISO(champ.endDate), 'dd/MM')}
+                            {fmtDate(champ.startDate, 'dd/MM')} – {fmtDate(champ.endDate, 'dd/MM')}
                           </p>
                         </div>
                         <div className="w-px bg-zinc-100" />
@@ -3048,7 +3069,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                         <div className="flex-1 px-3 py-2.5">
                           <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Prazo</p>
                           <p className="text-xs font-bold text-zinc-700">
-                            {format(parseISO(champ.registrationDeadline), "dd/MM HH:mm")}
+                            {fmtDate(champ.registrationDeadline, "dd/MM HH:mm")}
                           </p>
                         </div>
                       </div>

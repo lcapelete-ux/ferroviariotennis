@@ -9,6 +9,7 @@ import Admin from './pages/Admin';
 import Profile from './pages/Profile';
 import { AlertCircle } from 'lucide-react';
 import PreLoader from './components/PreLoader';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AnimatePresence, motion } from 'motion/react';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 
@@ -153,10 +154,12 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <SettingsProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </SettingsProvider>
+    <ErrorBoundary>
+      <SettingsProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </SettingsProvider>
+    </ErrorBoundary>
   );
 }
