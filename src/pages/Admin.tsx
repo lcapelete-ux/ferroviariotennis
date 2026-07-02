@@ -96,6 +96,12 @@ export default function Admin() {
   // Manual bracket builder: seed each round-1 slot with a specific registration (or a bye).
   const [manualBracket, setManualBracket] = useState<{ championshipId: string } | null>(null);
   const [manualSlots, setManualSlots] = useState<(string | null)[]>([]);
+  // Designate a helper organizer for an existing championship.
+  const [designatingOrganizer, setDesignatingOrganizer] = useState<string | null>(null);
+  const [organizerPick, setOrganizerPick] = useState('');
+  // Manual participant registration (inside the registrants modal).
+  const [manualRegUser1, setManualRegUser1] = useState('');
+  const [manualRegUser2, setManualRegUser2] = useState('');
   const [isResettingBookings, setIsResettingBookings] = useState(false);
   const [isResettingCredits, setIsResettingCredits] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -795,13 +801,44 @@ export default function Admin() {
 
   const handleCreateChampionship = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newChampionship.title || newChampionship.title.trim().length === 0) {
+      showAlert("Atenção", "Informe o nome do campeonato.", "warning");
+      return;
+    }
     try {
       const newChampRef = doc(collection(db, 'championships'));
-      await setDoc(newChampRef, {
-        ...newChampionship,
+      // Build a clean payload — Firestore rejects `undefined`, and empty number
+      // inputs parse to NaN, so coerce everything to safe values.
+      const num = (v: any, fallback: number) => (typeof v === 'number' && !isNaN(v) ? v : fallback);
+      const organizer = newChampionship.organizerId
+        ? users.find(u => u.uid === newChampionship.organizerId)
+        : undefined;
+      const payload: any = {
         id: newChampRef.id,
-        created_at: new Date().toISOString()
-      });
+        title: (newChampionship.title || '').trim(),
+        description: newChampionship.description || '',
+        type: newChampionship.type || 'singles',
+        startDate: newChampionship.startDate || format(new Date(), 'yyyy-MM-dd'),
+        endDate: newChampionship.endDate || format(addDays(new Date(), 7), 'yyyy-MM-dd'),
+        registrationStartDate: newChampionship.registrationStartDate || format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+        registrationDeadline: newChampionship.registrationDeadline || format(addDays(new Date(), 3), "yyyy-MM-dd'T'HH:mm"),
+        maxParticipants: num(newChampionship.maxParticipants, 32),
+        registrationFee: num(newChampionship.registrationFee, 0),
+        pixKey: newChampionship.pixKey || '',
+        isDrawnPairs: !!newChampionship.isDrawnPairs,
+        status: newChampionship.status || 'open',
+        created_at: new Date().toISOString(),
+      };
+      if (organizer) {
+        payload.organizerId = organizer.uid;
+        payload.organizerName = organizer.fullName;
+      }
+      await setDoc(newChampRef, payload);
+      // Grant the designated organizer permission to manage championships.
+      if (organizer) {
+        await updateDoc(doc(db, 'users', organizer.uid), { canManageChampionships: true });
+        setUsers(prev => prev.map(u => u.uid === organizer.uid ? { ...u, canManageChampionships: true } : u));
+      }
       showAlert("Sucesso", "Campeonato criado com sucesso!", 'success');
       setIsCreatingChampionship(false);
       setNewChampionship({
@@ -818,10 +855,13 @@ export default function Admin() {
         isDrawnPairs: false,
         status: 'open'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating championship:', error);
-      handleFirestoreError(error, OperationType.CREATE, 'championships');
-      showAlert("Erro", "Não foi possível criar o campeonato.", "error");
+      const code = error?.code || '';
+      const msg = code === 'permission-denied'
+        ? 'Permissão negada pelo Firestore. Confirme que sua conta é admin e que as regras foram publicadas.'
+        : (error?.message || String(error));
+      showAlert("Erro ao criar campeonato", msg, "error");
     }
   };
 
@@ -841,6 +881,78 @@ export default function Admin() {
         }
       }
     );
+  };
+
+  // Designate (or clear) the helper organizer of an existing championship.
+  const handleSetOrganizer = async () => {
+    if (!designatingOrganizer) return;
+    const champ = championships.find(c => c.id === designatingOrganizer);
+    if (!champ) return;
+    try {
+      if (organizerPick) {
+        const organizer = users.find(u => u.uid === organizerPick);
+        if (!organizer) return;
+        await updateDoc(doc(db, 'championships', champ.id), { organizerId: organizer.uid, organizerName: organizer.fullName });
+        // Grant the permission needed to manage championships.
+        await updateDoc(doc(db, 'users', organizer.uid), { canManageChampionships: true });
+        setUsers(prev => prev.map(u => u.uid === organizer.uid ? { ...u, canManageChampionships: true } : u));
+        showAlert("Sucesso", `${organizer.fullName} agora ajuda a organizar este campeonato.`, "success");
+      } else {
+        await updateDoc(doc(db, 'championships', champ.id), { organizerId: '', organizerName: '' });
+        showAlert("Sucesso", "Organizador removido deste campeonato.", "success");
+      }
+      setDesignatingOrganizer(null);
+      setOrganizerPick('');
+    } catch (error: any) {
+      console.error('Error setting organizer:', error);
+      showAlert("Erro", error?.message || String(error), "error");
+    }
+  };
+
+  // Manually enter a participant (singles) or pair (doubles) into a championship.
+  const handleAddManualRegistration = async () => {
+    const champ = championships.find(c => c.id === viewingRegistrants);
+    if (!champ) return;
+    const u1 = users.find(u => u.uid === manualRegUser1);
+    if (!u1) { showAlert("Atenção", "Selecione o participante.", "warning"); return; }
+    const u2 = manualRegUser2 ? users.find(u => u.uid === manualRegUser2) : undefined;
+    if (u2 && u2.uid === u1.uid) { showAlert("Atenção", "Escolha dois sócios diferentes.", "warning"); return; }
+    const activeRegs = championshipRegistrations.filter(r => r.championshipId === champ.id && !r.isDrawn && r.status !== 'cancelled');
+    const alreadyIn = (uid: string) => activeRegs.some(r => r.userId1 === uid || r.userId2 === uid);
+    if (alreadyIn(u1.uid) || (u2 && alreadyIn(u2.uid))) {
+      showAlert("Atenção", "Um dos participantes já está inscrito neste campeonato.", "warning");
+      return;
+    }
+    try {
+      const ref = doc(collection(db, 'championship_registrations'));
+      const reg: any = {
+        id: ref.id,
+        championshipId: champ.id,
+        userId1: u1.uid,
+        userName1: u1.fullName,
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        created_at: new Date().toISOString(),
+      };
+      if (u2) { reg.userId2 = u2.uid; reg.userName2 = u2.fullName; }
+      await setDoc(ref, reg);
+      setManualRegUser1('');
+      setManualRegUser2('');
+      showAlert("Sucesso", "Participante inscrito!", "success");
+    } catch (error: any) {
+      console.error('Error adding manual registration:', error);
+      showAlert("Erro", error?.message || String(error), "error");
+    }
+  };
+
+  const handleDeleteRegistration = async (regId: string) => {
+    try {
+      await deleteDoc(doc(db, 'championship_registrations', regId));
+      showAlert("Sucesso", "Inscrição removida.", "success");
+    } catch (error: any) {
+      console.error('Error deleting registration:', error);
+      showAlert("Erro", error?.message || String(error), "error");
+    }
   };
 
   const handleUpdateChampionshipStatus = async (id: string, status: Championship['status']) => {
@@ -2024,6 +2136,12 @@ export default function Admin() {
                           <span>Duplas Sorteadas</span>
                         </div>
                       )}
+                      {champ.organizerName && (
+                        <div className="flex items-center gap-2 text-violet-600 font-bold">
+                          <Users className="w-4 h-4" />
+                          <span>Organizador: {champ.organizerName}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -2078,6 +2196,16 @@ export default function Admin() {
                       <FileText className="w-4 h-4" />
                       Pagamentos
                     </button>
+                    {isSystemAdmin && (
+                      <button
+                        onClick={() => { setDesignatingOrganizer(champ.id); setOrganizerPick(champ.organizerId || ''); }}
+                        className="px-3 py-1.5 text-xs font-bold text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 border border-violet-100 flex items-center gap-1 whitespace-nowrap"
+                        title="Designar quem ajuda a organizar"
+                      >
+                        <Users className="w-4 h-4" />
+                        Organizador
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDeleteChampionship(champ.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -2344,7 +2472,24 @@ export default function Admin() {
                   />
                 </div>
               </div>
-              
+
+              {isSystemAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Organizador auxiliar (opcional)</label>
+                  <select
+                    value={newChampionship.organizerId || ''}
+                    onChange={e => setNewChampionship(prev => ({ ...prev, organizerId: e.target.value || undefined }))}
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                  >
+                    <option value="">Ninguém (só o admin gerencia)</option>
+                    {users.filter(u => u.role !== 'admin').sort((a, b) => a.fullName.localeCompare(b.fullName)).map(u => (
+                      <option key={u.uid} value={u.uid}>{u.fullName}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-zinc-400 mt-1">Poderá montar chaves, cadastrar participantes e lançar resultados.</p>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -2361,6 +2506,49 @@ export default function Admin() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {designatingOrganizer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-zinc-100 my-8">
+            <div className="flex justify-between items-start mb-4 gap-4">
+              <div className="min-w-0">
+                <h3 className="text-xl font-black text-zinc-900">Organizador auxiliar</h3>
+                <p className="text-sm text-zinc-500 mt-1 truncate">{championships.find(c => c.id === designatingOrganizer)?.title}</p>
+              </div>
+              <button onClick={() => { setDesignatingOrganizer(null); setOrganizerPick(''); }} className="text-zinc-400 hover:text-zinc-600 shrink-0">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-500 mb-3">
+              A pessoa escolhida poderá <b>montar as chaves</b>, <b>cadastrar participantes</b> e <b>lançar resultados</b> dos campeonatos.
+            </p>
+            <select
+              value={organizerPick}
+              onChange={(e) => setOrganizerPick(e.target.value)}
+              className="w-full px-3 py-2.5 border border-zinc-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm font-medium"
+            >
+              <option value="">Ninguém (só o admin gerencia)</option>
+              {users.filter(u => u.role !== 'admin').sort((a, b) => a.fullName.localeCompare(b.fullName)).map(u => (
+                <option key={u.uid} value={u.uid}>{u.fullName}</option>
+              ))}
+            </select>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setDesignatingOrganizer(null); setOrganizerPick(''); }}
+                className="flex-1 py-2.5 px-4 border border-zinc-300 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSetOrganizer}
+                className="flex-1 py-2.5 px-4 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700"
+              >
+                Salvar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2811,14 +2999,51 @@ export default function Admin() {
               </button>
             </div>
 
-            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden">
-              <table className="w-full text-left">
+            {/* Manual registration — enter a member (or pair) by hand */}
+            <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-4 mb-4">
+              <p className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-3">Cadastrar participante manualmente</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={manualRegUser1}
+                  onChange={(e) => setManualRegUser1(e.target.value)}
+                  className="flex-1 min-w-0 px-3 py-2 border border-zinc-300 rounded-xl bg-white text-sm font-medium focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="">Selecione o sócio...</option>
+                  {users.slice().sort((a, b) => a.fullName.localeCompare(b.fullName)).map(u => (
+                    <option key={u.uid} value={u.uid}>{u.fullName}</option>
+                  ))}
+                </select>
+                {championships.find(c => c.id === viewingRegistrants)?.type === 'doubles' &&
+                 !championships.find(c => c.id === viewingRegistrants)?.isDrawnPairs && (
+                  <select
+                    value={manualRegUser2}
+                    onChange={(e) => setManualRegUser2(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 border border-zinc-300 rounded-xl bg-white text-sm font-medium focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="">Parceiro (dupla)...</option>
+                    {users.filter(u => u.uid !== manualRegUser1).slice().sort((a, b) => a.fullName.localeCompare(b.fullName)).map(u => (
+                      <option key={u.uid} value={u.uid}>{u.fullName}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={handleAddManualRegistration}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shrink-0 flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Inscrever
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden overflow-x-auto">
+              <table className="w-full text-left min-w-[520px]">
                 <thead className="bg-zinc-100 border-b border-zinc-200">
                   <tr>
                     <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">Jogador 1 / Sócio</th>
                     <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">Jogador 2 / Parceiro</th>
                     <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest text-center">Tipo</th>
                     <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest text-center">Data Inscrição</th>
+                    <th className="px-4 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
@@ -2840,11 +3065,20 @@ export default function Admin() {
                         <td className="px-6 py-4 text-center text-xs font-mono text-zinc-500">
                           {reg.created_at ? format(parseISO(reg.created_at), 'dd/MM/yyyy HH:mm') : 'N/A'}
                         </td>
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => handleDeleteRegistration(reg.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remover inscrição"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   {championshipRegistrations.filter(r => r.championshipId === viewingRegistrants && !r.isDrawn && r.status !== 'cancelled').length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-zinc-500 italic">
+                      <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 italic">
                         Nenhum inscrito confirmado neste campeonato ainda.
                       </td>
                     </tr>
@@ -2852,7 +3086,7 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
-            
+
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setViewingRegistrants(null)}

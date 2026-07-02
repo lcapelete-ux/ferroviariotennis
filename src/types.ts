@@ -73,6 +73,8 @@ export interface Championship {
   pixKey?: string;
   isDrawnPairs?: boolean;
   status: 'open' | 'closed' | 'finished';
+  organizerId?: string;   // member designated by the admin to help organize this championship
+  organizerName?: string;
   created_at: string;
   updated_at: string;
 }
