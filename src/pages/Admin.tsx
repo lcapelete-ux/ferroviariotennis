@@ -868,16 +868,26 @@ export default function Admin() {
   const handleDeleteChampionship = async (id: string) => {
     showConfirm(
       "Excluir Campeonato",
-      "Tem certeza que deseja excluir este campeonato? Todas as inscrições serão perdidas.",
+      "Tem certeza que deseja excluir este campeonato? Todas as inscrições e chaves serão perdidas.",
       async () => {
         try {
-          await deleteDoc(doc(db, 'championships', id));
+          // Delete the championship and everything tied to it in one batch.
+          const batch = writeBatch(db);
+          batch.delete(doc(db, 'championships', id));
+          const regsSnap = await getDocs(query(collection(db, 'championship_registrations'), where('championshipId', '==', id)));
+          regsSnap.docs.forEach(d => batch.delete(d.ref));
+          const matchSnap = await getDocs(query(collection(db, 'championship_matches'), where('championshipId', '==', id)));
+          matchSnap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
           setChampionships(prev => prev.filter(c => c.id !== id));
           showAlert("Sucesso", "Campeonato excluído.", 'success');
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error deleting championship:', error);
-          handleFirestoreError(error, OperationType.DELETE, `championships/${id}`);
-          showAlert("Erro", "Não foi possível excluir o campeonato.", "error");
+          const code = error?.code || '';
+          const msg = code === 'permission-denied'
+            ? 'Permissão negada. Só o admin pode excluir, e as regras do Firestore precisam estar publicadas.'
+            : (error?.message || String(error));
+          showAlert("Erro ao excluir", msg, "error");
         }
       }
     );
@@ -2145,11 +2155,11 @@ export default function Admin() {
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex gap-2">
+                  <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex flex-wrap gap-2">
                     <select
                       value={champ.status}
                       onChange={(e) => handleUpdateChampionshipStatus(champ.id, e.target.value as any)}
-                      className="flex-grow text-xs border-zinc-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 py-1.5"
+                      className="flex-1 min-w-[130px] text-xs border-zinc-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 py-1.5"
                     >
                       <option value="open">Abrir Inscrições</option>
                       <option value="closed">Fechar Inscrições</option>
@@ -2208,10 +2218,11 @@ export default function Admin() {
                     )}
                     <button
                       onClick={() => handleDeleteChampionship(champ.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir"
+                      className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 border border-red-100 flex items-center gap-1 whitespace-nowrap"
+                      title="Excluir campeonato"
                     >
                       <Trash2 className="w-4 h-4" />
+                      Excluir
                     </button>
                   </div>
                 </div>
