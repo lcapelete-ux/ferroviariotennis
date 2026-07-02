@@ -4,7 +4,7 @@ import { UserProfile, Booking, Championship, ChampionshipRegistration, Champions
 import { format, addDays, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Shield, Users, Calendar as CalendarIcon, AlertTriangle, Download, Trophy, ArrowRight, ArrowLeft, Trash2, FileText, Bell, CheckCircle, Plus, X, ShieldAlert, AlertCircle, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, getDoc, writeBatch } from 'firebase/firestore';
@@ -20,6 +20,8 @@ export default function Admin() {
   const { settings: globalSettings } = useSettings();
   const navigate = useNavigate();
   const isSystemAdmin = profile?.role === 'admin' || user?.email === 'tennisffc2@gmail.com';
+  // Anyone allowed to manage championships: system admins, professors, or members granted the flag.
+  const canManage = isSystemAdmin || profile?.role === 'professor' || !!profile?.canManageChampionships;
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [alerts, setAlerts] = useState<AdminAlert[]>([]);
@@ -37,11 +39,18 @@ export default function Admin() {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [observationEdit, setObservationEdit] = useState('');
 
+  const [searchParams] = useSearchParams();
   useEffect(() => {
-    if (profile?.canManageChampionships && !isSystemAdmin) {
+    // Deep-link to a specific tab (e.g. sidebar "Gerenciar Campeonatos" → /admin?tab=championships).
+    if (searchParams.get('tab') === 'championships') {
+      setActiveTab('championships');
+      return;
+    }
+    // Non-admins (professors / championship managers) only have championship-related tabs.
+    if (!isSystemAdmin) {
       setActiveTab('championships');
     }
-  }, [profile?.canManageChampionships, isSystemAdmin]);
+  }, [isSystemAdmin, searchParams]);
 
   useEffect(() => {
     if (globalSettings) {
@@ -84,6 +93,9 @@ export default function Admin() {
       p2Name: string;
     }[];
   } | null>(null);
+  // Manual bracket builder: seed each round-1 slot with a specific registration (or a bye).
+  const [manualBracket, setManualBracket] = useState<{ championshipId: string } | null>(null);
+  const [manualSlots, setManualSlots] = useState<(string | null)[]>([]);
   const [isResettingBookings, setIsResettingBookings] = useState(false);
   const [isResettingCredits, setIsResettingCredits] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -226,7 +238,7 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (profile?.role !== 'admin' && !profile?.canManageChampionships) return;
+    if (!canManage) return;
 
     const fetchAll = async () => {
       setLoading(true);
@@ -447,10 +459,10 @@ export default function Admin() {
     );
   };
 
-  const handleToggleChampionshipPermission = async (userId: string, canManage: boolean) => {
+  const handleToggleChampionshipPermission = async (userId: string, allowed: boolean) => {
     try {
-      await updateDoc(doc(db, 'users', userId), { canManageChampionships: canManage });
-      setUsers(prev => prev.map(u => u.uid === userId ? { ...u, canManageChampionships: canManage } : u));
+      await updateDoc(doc(db, 'users', userId), { canManageChampionships: allowed });
+      setUsers(prev => prev.map(u => u.uid === userId ? { ...u, canManageChampionships: allowed } : u));
       showAlert("Sucesso", "Permissão de campeonatos atualizada.", 'success');
     } catch (error) {
       console.error('Error updating permission:', error);
@@ -954,31 +966,29 @@ export default function Admin() {
     }
   };
 
-  const handleConfirmAndWriteBracket = async () => {
-    if (!bracketSimulation) return;
-    const { championshipId, drawnPairsToCreate, shuffledParticipants } = bracketSimulation;
-    
-    const champ = championships.find(c => c.id === championshipId);
-    if (!champ) return;
+  // Shared bracket writer. `ordered` is the round-1 seeding (registration objects, or
+  // null for an empty/bye slot). Used by both the random draw and the manual builder.
+  const writeBracketFromOrdered = async (champ: Championship, ordered: (any | null)[], drawnPairsToCreate: any[] = []) => {
+    const nameOf = (p: any) => champ.type === 'singles' ? p.userName1 : `${p.userName1} / ${p.userName2 || '?'}`;
 
     setLoading(true);
     try {
-      // 1. Save Drawn Pairs (if any)
+      // 1. Persist any drawn pairs first (random doubles draw).
       if (drawnPairsToCreate.length > 0) {
         const batchRegs = writeBatch(db);
-        drawnPairsToCreate.forEach(reg => {
-          batchRegs.set(doc(db, 'championship_registrations', reg.id), reg);
-        });
+        drawnPairsToCreate.forEach(reg => batchRegs.set(doc(db, 'championship_registrations', reg.id), reg));
         await batchRegs.commit();
       }
 
-      // 2. Determine number of rounds
-      const numParticipants = shuffledParticipants.length;
-      const numRounds = Math.ceil(Math.log2(numParticipants));
-      
-      // 3. Create matches round by round (from final to first)
+      // 2. Size the bracket to the next power of two and pad with empty slots.
+      const realCount = ordered.filter(Boolean).length;
+      const numRounds = Math.max(1, Math.ceil(Math.log2(Math.max(realCount, 2))));
+      const slotCount = Math.pow(2, numRounds);
+      const slots = [...ordered];
+      while (slots.length < slotCount) slots.push(null);
+
+      // 3. Create matches round by round (final → first), linking each to its next match.
       let nextRoundMatchIds: string[] = [];
-      
       for (let r = numRounds; r >= 1; r--) {
         const matchesInRound = Math.pow(2, numRounds - r);
         const batch = writeBatch(db);
@@ -988,7 +998,7 @@ export default function Admin() {
           const matchRef = doc(collection(db, 'championship_matches'));
           const matchData = {
             id: matchRef.id,
-            championshipId,
+            championshipId: champ.id,
             round: r,
             matchNumber: m,
             nextMatchId: r < numRounds ? nextRoundMatchIds[Math.floor(m / 2)] : null,
@@ -998,58 +1008,106 @@ export default function Admin() {
           batch.set(matchRef, matchData);
           roundMatches.push(matchData);
         }
-        
+
         await batch.commit();
         const sortedInserted = roundMatches.sort((a, b) => a.matchNumber - b.matchNumber);
         nextRoundMatchIds = sortedInserted.map(m => m.id);
-        
-        // If this is round 1, assign participants
+
+        // Assign the seeded participants to round 1.
         if (r === 1) {
           for (let i = 0; i < sortedInserted.length; i++) {
             const match = sortedInserted[i];
-            const p1 = shuffledParticipants[i * 2];
-            const p2 = shuffledParticipants[i * 2 + 1];
-            
+            const p1 = slots[i * 2];
+            const p2 = slots[i * 2 + 1];
+
             const update: any = {};
-            if (p1) {
-              update.participant1Id = p1.id;
-              update.participant1Name = champ.type === 'singles' ? p1.userName1 : `${p1.userName1} / ${p1.userName2 || '?'}`;
-            }
-            if (p2) {
-              update.participant2Id = p2.id;
-              update.participant2Name = champ.type === 'singles' ? p2.userName1 : `${p2.userName1} / ${p2.userName2 || '?'}`;
-            } else if (p1) {
-              // Bye! Advance p1 automatically
-              update.winnerId = p1.id;
+            if (p1) { update.participant1Id = p1.id; update.participant1Name = nameOf(p1); }
+            if (p2) { update.participant2Id = p2.id; update.participant2Name = nameOf(p2); }
+
+            // Exactly one participant present → bye, auto-advance.
+            const present = (p1 && !p2) ? p1 : ((!p1 && p2) ? p2 : null);
+            if (present) {
+              update.winnerId = present.id;
               update.status = 'finished';
-              update.score1 = 'W';
-              update.score2 = 'O';
+              update.score1 = p1 ? 'W' : 'O';
+              update.score2 = p2 ? 'W' : 'O';
             }
-            
+
             await updateDoc(doc(db, 'championship_matches', match.id), update);
-            
-            // If winner advanced, update next match
-            if (update.winnerId && match.nextMatchId) {
+
+            if (present && match.nextMatchId) {
               const isP1 = match.matchNumber % 2 === 0;
               await updateDoc(doc(db, 'championship_matches', match.nextMatchId), {
-                [isP1 ? 'participant1Id' : 'participant2Id']: update.winnerId,
-                [isP1 ? 'participant1Name' : 'participant2Name']: update.participant1Name
+                [isP1 ? 'participant1Id' : 'participant2Id']: present.id,
+                [isP1 ? 'participant1Name' : 'participant2Name']: nameOf(present)
               });
             }
           }
         }
       }
-      
-      showAlert("Sucesso", "Chaves gravadas e confirmadas com sucesso!", "success");
+
+      showAlert("Sucesso", "Chaves criadas com sucesso!", "success");
       setBracketSimulation(null);
-      setViewingBracket(championshipId);
+      setManualBracket(null);
+      setViewingBracket(champ.id);
     } catch (error) {
-      console.error('Error confirming and writing bracket:', error);
+      console.error('Error writing bracket:', error);
       handleFirestoreError(error, OperationType.WRITE, 'championship_matches');
-      showAlert("Erro", "Falha ao gravar chaves geradas.", "error");
+      showAlert("Erro", "Falha ao gravar as chaves.", "error");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmAndWriteBracket = async () => {
+    if (!bracketSimulation) return;
+    const { championshipId, drawnPairsToCreate, shuffledParticipants } = bracketSimulation;
+    const champ = championships.find(c => c.id === championshipId);
+    if (!champ) return;
+    await writeBracketFromOrdered(champ, shuffledParticipants, drawnPairsToCreate);
+  };
+
+  // Open the manual builder: pre-seed slots with current registrations in order,
+  // padded with empty (bye) slots up to the next power of two.
+  const handleOpenManualBracket = (championshipId: string) => {
+    const champ = championships.find(c => c.id === championshipId);
+    if (!champ) return;
+    const pool = championshipRegistrations.filter(r => r.championshipId === championshipId && !r.isDrawn && r.status !== 'cancelled');
+    if (pool.length < 2) {
+      showAlert("Erro", "É necessário pelo menos 2 inscritos para montar as chaves.", "error");
+      return;
+    }
+    const numRounds = Math.max(1, Math.ceil(Math.log2(pool.length)));
+    const slotCount = Math.pow(2, numRounds);
+    const slots: (string | null)[] = pool.map(r => r.id);
+    while (slots.length < slotCount) slots.push(null);
+    setManualSlots(slots);
+    setManualBracket({ championshipId });
+  };
+
+  const handleConfirmManualBracket = async () => {
+    if (!manualBracket) return;
+    const champ = championships.find(c => c.id === manualBracket.championshipId);
+    if (!champ) return;
+    const pool = championshipRegistrations.filter(r => r.championshipId === champ.id && !r.isDrawn);
+    const ordered = manualSlots.map(id => id ? (pool.find(r => r.id === id) || null) : null);
+    const filled = ordered.filter(Boolean);
+    if (filled.length < 2) {
+      showAlert("Erro", "Selecione ao menos 2 participantes.", "error");
+      return;
+    }
+    const ids = filled.map((p: any) => p.id);
+    if (new Set(ids).size !== ids.length) {
+      showAlert("Erro", "Há participantes repetidos nas chaves. Cada inscrito só pode aparecer uma vez.", "error");
+      return;
+    }
+    await writeBracketFromOrdered(champ, ordered, []);
+  };
+
+  // Round count derived from the actual matches (robust for byes / drawn pairs).
+  const bracketRoundsFor = (championshipId: string) => {
+    const ms = championshipMatches.filter(m => m.championshipId === championshipId);
+    return ms.length ? Math.max(...ms.map(m => m.round)) : 1;
   };
 
   const handleUpdateMatchScore = async (match: ChampionshipMatch, s1: string, s2: string, winnerId?: string) => {
@@ -1915,7 +1973,7 @@ export default function Admin() {
             </div>
           </div>
         )}
-        {(isSystemAdmin || profile?.canManageChampionships) && activeTab === 'championships' && (
+        {canManage && activeTab === 'championships' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-zinc-800">Gerenciar Campeonatos Internos</h2>
@@ -1987,12 +2045,22 @@ export default function Admin() {
                         Ver Chaves
                       </button>
                     ) : (
-                      <button
-                        onClick={() => handleGenerateBracketPreview(champ.id)}
-                        className="px-3 py-1.5 text-xs font-bold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 border border-zinc-200"
-                      >
-                        Gerar Chaves
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleOpenManualBracket(champ.id)}
+                          className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 border border-emerald-100 whitespace-nowrap"
+                          title="Definir manualmente quem joga contra quem"
+                        >
+                          Montar Chaves
+                        </button>
+                        <button
+                          onClick={() => handleGenerateBracketPreview(champ.id)}
+                          className="px-3 py-1.5 text-xs font-bold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 border border-zinc-200 whitespace-nowrap"
+                          title="Sorteio aleatório"
+                        >
+                          Sortear
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => setViewingRegistrants(champ.id)}
@@ -2395,17 +2463,17 @@ export default function Admin() {
             </div>
 
             <div className="flex gap-12 overflow-x-auto pb-8 min-h-[600px]">
-              {Array.from({ length: Math.ceil(Math.log2(championshipRegistrations.filter(r => r.championshipId === viewingBracket).length)) }).map((_, roundIdx) => {
+              {Array.from({ length: bracketRoundsFor(viewingBracket) }).map((_, roundIdx) => {
                 const round = roundIdx + 1;
                 const matchesInRound = championshipMatches
                   .filter(m => m.championshipId === viewingBracket && m.round === round)
                   .sort((a, b) => a.matchNumber - b.matchNumber);
-                
+
                 return (
                   <div key={round} className="flex flex-col gap-8 min-w-[250px]">
                     <h4 className="text-center font-black text-zinc-400 uppercase tracking-widest text-xs mb-4">
-                      {round === 1 ? 'Primeira Rodada' : 
-                       round === Math.ceil(Math.log2(championshipRegistrations.filter(r => r.championshipId === viewingBracket).length)) ? 'Final' : 
+                      {round === 1 ? 'Primeira Rodada' :
+                       round === bracketRoundsFor(viewingBracket) ? 'Final' :
                        `Rodada ${round}`}
                     </h4>
                     <div className="flex flex-col justify-around flex-grow gap-8">
@@ -2875,6 +2943,102 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {/* Manual bracket builder — assign each round-1 slot to a specific registrant. */}
+      {manualBracket && (() => {
+        const champ = championships.find(c => c.id === manualBracket.championshipId);
+        const pool = championshipRegistrations.filter(r => r.championshipId === manualBracket.championshipId && !r.isDrawn && r.status !== 'cancelled');
+        const labelOf = (r: any) => champ?.type === 'singles' ? r.userName1 : `${r.userName1} / ${r.userName2 || '?'}`;
+        const usedIds = manualSlots.filter(Boolean) as string[];
+        const setSlot = (index: number, value: string) =>
+          setManualSlots(prev => prev.map((s, i) => i === index ? (value || null) : s));
+        const numMatches = manualSlots.length / 2;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-white rounded-3xl shadow-xl w-full max-w-3xl p-6 sm:p-8 border border-zinc-100 my-8">
+              <div className="flex justify-between items-start mb-6 gap-4">
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight">Montar Chaves Manualmente</h3>
+                  <p className="text-sm text-zinc-500 mt-1 truncate">{champ?.title}</p>
+                  <p className="text-xs text-zinc-400 mt-1">Escolha quem joga contra quem na 1ª rodada. Slots vazios contam como "bye".</p>
+                </div>
+                <button onClick={() => setManualBracket(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0">
+                  <X className="w-7 h-7" />
+                </button>
+              </div>
+
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => {
+                    const shuffledPool = [...pool].sort(() => Math.random() - 0.5).map(r => r.id);
+                    const slots: (string | null)[] = [...shuffledPool];
+                    while (slots.length < manualSlots.length) slots.push(null);
+                    setManualSlots(slots);
+                  }}
+                  className="text-xs font-bold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-lg transition-all"
+                >
+                  Embaralhar posições
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Array.from({ length: numMatches }).map((_, m) => {
+                  const idxA = m * 2;
+                  const idxB = m * 2 + 1;
+                  const renderSelect = (index: number) => {
+                    const current = manualSlots[index] || '';
+                    return (
+                      <select
+                        value={current}
+                        onChange={(e) => setSlot(index, e.target.value)}
+                        className="w-full text-sm font-medium text-zinc-800 bg-white border-2 border-zinc-200 rounded-xl px-3 py-2 focus:border-emerald-500 focus:ring-0"
+                      >
+                        <option value="">— Vazio (Bye) —</option>
+                        {pool.map(r => {
+                          const usedElsewhere = usedIds.includes(r.id) && current !== r.id;
+                          return (
+                            <option key={r.id} value={r.id} disabled={usedElsewhere}>
+                              {labelOf(r)}{usedElsewhere ? ' (já escalado)' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    );
+                  };
+                  return (
+                    <div key={m} className="bg-zinc-50 rounded-2xl border border-zinc-200 p-4">
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-2">Jogo {m + 1}</span>
+                      <div className="space-y-2">
+                        {renderSelect(idxA)}
+                        <div className="text-[10px] font-black text-zinc-300 text-center uppercase tracking-widest">vs</div>
+                        {renderSelect(idxB)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-8 pt-4 border-t border-zinc-100 flex justify-end gap-3">
+                <button
+                  onClick={() => setManualBracket(null)}
+                  className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmManualBracket}
+                  disabled={loading}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-100 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Criar Chaves
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

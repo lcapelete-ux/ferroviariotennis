@@ -60,6 +60,12 @@ export default function Dashboard() {
   const [allRegistrations, setAllRegistrations] = useState<ChampionshipRegistration[]>([]);
   const [championshipMatches, setChampionshipMatches] = useState<ChampionshipMatch[]>([]);
   const [viewingBracket, setViewingBracket] = useState<string | null>(null);
+  // Score entry: a participant (or admin) marking the result of their own match.
+  const [scoringMatch, setScoringMatch] = useState<ChampionshipMatch | null>(null);
+  const [scoreInputA, setScoreInputA] = useState('');
+  const [scoreInputB, setScoreInputB] = useState('');
+  const [scoreWinner, setScoreWinner] = useState<string | null>(null);
+  const [savingScore, setSavingScore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'calendar' | 'ranking' | 'professor' | 'my-bookings' | 'free-slots' | 'profile' | 'admin-professors' | 'championships' | 'maintenance-report' | 'rules'>('calendar');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -261,6 +267,69 @@ ${window.location.origin}`;
         }
       }
     );
+  };
+
+  // Registration IDs of the current championship the logged-in user belongs to.
+  const myBracketRegIds = React.useMemo(() => {
+    if (!viewingBracket) return [] as string[];
+    return allRegistrations
+      .filter(r => r.championshipId === viewingBracket && (r.userId1 === user?.uid || r.userId2 === user?.uid))
+      .map(r => r.id);
+  }, [viewingBracket, allRegistrations, user?.uid]);
+
+  const canManageChampionships = profile?.role === 'admin' || profile?.role === 'professor' || !!profile?.canManageChampionships;
+
+  const openScoring = (match: ChampionshipMatch) => {
+    setScoringMatch(match);
+    setScoreInputA(match.score1 || '');
+    setScoreInputB(match.score2 || '');
+    setScoreWinner(match.winnerId || null);
+  };
+
+  const handleSaveMatchResult = async () => {
+    if (!scoringMatch) return;
+    const match = scoringMatch;
+    let winnerId = scoreWinner;
+    // Infer winner from scores if not explicitly chosen.
+    if (!winnerId) {
+      const a = parseInt(scoreInputA);
+      const b = parseInt(scoreInputB);
+      if (!isNaN(a) && !isNaN(b) && a !== b) {
+        winnerId = a > b ? match.participant1Id || null : match.participant2Id || null;
+      }
+    }
+    if (!winnerId) {
+      showAlert("Atenção", "Selecione o vencedor da partida.", "warning");
+      return;
+    }
+    const winnerName = winnerId === match.participant1Id ? match.participant1Name : match.participant2Name;
+    setSavingScore(true);
+    try {
+      await updateDoc(doc(db, 'championship_matches', match.id), {
+        score1: scoreInputA || '0',
+        score2: scoreInputB || '0',
+        winnerId,
+        status: 'finished',
+        updated_at: new Date().toISOString(),
+      });
+      // Advance the winner into the next match's correct slot.
+      if (match.nextMatchId) {
+        const isP1 = match.matchNumber % 2 === 0;
+        await updateDoc(doc(db, 'championship_matches', match.nextMatchId), {
+          [isP1 ? 'participant1Id' : 'participant2Id']: winnerId,
+          [isP1 ? 'participant1Name' : 'participant2Name']: winnerName,
+          updated_at: new Date().toISOString(),
+        });
+      }
+      setScoringMatch(null);
+      showAlert("Sucesso", "Resultado salvo!", "success");
+    } catch (error) {
+      console.error('Error saving match result:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `championship_matches/${match.id}`);
+      showAlert("Erro", "Não foi possível salvar o resultado.", "error");
+    } finally {
+      setSavingScore(false);
+    }
   };
 
   const ranking = React.useMemo(() => {
@@ -1570,6 +1639,13 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                 </button>
               ))}
               <button
+                onClick={() => navigate('/admin?tab=championships')}
+                className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-white/10 hover:text-white"
+              >
+                <Trophy className="w-5 h-5" />
+                <span>Camp.</span>
+              </button>
+              <button
                 onClick={() => navigate('/admin')}
                 className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-white/10 hover:text-white"
               >
@@ -1578,25 +1654,37 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
               </button>
             </>
           )}
-          {(profile?.role !== 'admin' && profile?.canManageChampionships) && (
+          {profile?.role === 'professor' && (
+            <>
+              <div className="pt-3 pb-1 flex items-center justify-center">
+                <div className="h-px w-8 bg-white/10" />
+              </div>
+              <button
+                onClick={() => navigate('/admin?tab=championships')}
+                className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-white/10 hover:text-white"
+              >
+                <Trophy className="w-5 h-5" />
+                <span>Camp.</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('professor'); setSidebarOpen(false); }}
+                className={clsx(
+                  "w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center",
+                  activeTab === 'professor' ? "bg-emerald-600 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-white"
+                )}
+              >
+                <GraduationCap className="w-5 h-5" />
+                <span>Aulas</span>
+              </button>
+            </>
+          )}
+          {(profile?.role !== 'admin' && profile?.role !== 'professor' && profile?.canManageChampionships) && (
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/admin?tab=championships')}
               className="w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center text-zinc-400 hover:bg-white/10 hover:text-white"
             >
-              <Shield className="w-5 h-5" />
-              <span>Gerenciar</span>
-            </button>
-          )}
-          {profile?.role === 'professor' && (
-            <button
-              onClick={() => { setActiveTab('professor'); setSidebarOpen(false); }}
-              className={clsx(
-                "w-full flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all text-center",
-                activeTab === 'professor' ? "bg-emerald-600 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-white"
-              )}
-            >
-              <GraduationCap className="w-5 h-5" />
-              <span>Professor</span>
+              <Trophy className="w-5 h-5" />
+              <span>Camp.</span>
             </button>
           )}
         </nav>
@@ -3256,7 +3344,9 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
       {viewingBracket && (() => {
         const champ = championships.find(c => c.id === viewingBracket);
         const champRegs = allRegistrations.filter(r => r.championshipId === viewingBracket);
-        const totalRounds = Math.max(1, Math.ceil(Math.log2(Math.max(champRegs.length, 2))));
+        const champMatches = championshipMatches.filter(m => m.championshipId === viewingBracket);
+        // Derive round count from the actual matches (robust for byes / drawn pairs).
+        const totalRounds = champMatches.length ? Math.max(...champMatches.map(m => m.round)) : 1;
 
         const getRoundLabel = (round: number) => {
           if (round === totalRounds) return 'Final';
@@ -3318,6 +3408,10 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                           const p1Wins = !!(match.winnerId && match.winnerId === match.participant1Id);
                           const p2Wins = !!(match.winnerId && match.winnerId === match.participant2Id);
                           const done = match.status === 'finished';
+                          const bothPresent = !!(match.participant1Id && match.participant2Id);
+                          const isMine = myBracketRegIds.includes(match.participant1Id || '') || myBracketRegIds.includes(match.participant2Id || '');
+                          // Participants can record their own pending match; managers can edit any match freely.
+                          const canScore = bothPresent && ((!done && isMine) || canManageChampionships);
 
                           return (
                             <div
@@ -3362,6 +3456,16 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                                   </span>
                                 </div>
                               ))}
+
+                              {canScore && (
+                                <button
+                                  onClick={() => openScoring(match)}
+                                  className="w-full text-[10px] font-black uppercase tracking-widest py-2 transition-all active:scale-95"
+                                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: done ? 'rgba(255,255,255,0.4)' : '#c8f020' }}
+                                >
+                                  {done ? 'Editar Resultado' : 'Marcar Resultado'}
+                                </button>
+                              )}
                             </div>
                           );
                         }) : (
@@ -3383,6 +3487,68 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
           </div>
         );
       })()}
+
+      {/* Score entry modal — participant records their result / manager edits freely */}
+      {scoringMatch && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" style={{ background: 'rgba(4,8,6,0.85)' }}>
+          <div className="w-full max-w-sm rounded-3xl overflow-hidden" style={{ background: '#141f1a', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest">Resultado</h3>
+              <button onClick={() => setScoringMatch(null)} className="text-white/40 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              {[
+                { id: scoringMatch.participant1Id, name: scoringMatch.participant1Name, score: scoreInputA, setScore: setScoreInputA },
+                { id: scoringMatch.participant2Id, name: scoringMatch.participant2Name, score: scoreInputB, setScore: setScoreInputB },
+              ].map((p, i) => {
+                const selected = scoreWinner === p.id;
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-2xl p-3"
+                    style={{ background: selected ? 'rgba(200,240,32,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selected ? 'rgba(200,240,32,0.5)' : 'rgba(255,255,255,0.08)'}` }}
+                  >
+                    <button
+                      onClick={() => setScoreWinner(p.id || null)}
+                      className="flex-1 text-left min-w-0"
+                    >
+                      <span className="block text-[9px] font-black uppercase tracking-widest" style={{ color: selected ? '#c8f020' : 'rgba(255,255,255,0.3)' }}>
+                        {selected ? '✓ Vencedor' : 'Tocar p/ vencedor'}
+                      </span>
+                      <span className="block text-sm font-bold text-white truncate">{p.name || 'Aguardando...'}</span>
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={p.score}
+                      onChange={(e) => p.setScore(e.target.value)}
+                      className="w-14 h-11 text-center text-lg font-black text-white rounded-xl focus:outline-none"
+                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)' }}
+                      placeholder="0"
+                    />
+                  </div>
+                );
+              })}
+
+              <p className="text-[10px] text-center pt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Toque no nome do vencedor e informe o placar.
+              </p>
+
+              <button
+                onClick={handleSaveMatchResult}
+                disabled={savingScore}
+                className="w-full py-3 rounded-2xl text-sm font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+                style={{ background: '#c8f020', color: '#011a0d' }}
+              >
+                {savingScore ? 'Salvando...' : 'Salvar Resultado'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Animated Booking Confirmation Overlay */}
       <AnimatePresence>

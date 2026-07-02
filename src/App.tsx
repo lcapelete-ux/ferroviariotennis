@@ -29,12 +29,16 @@ const MiniLoader = () => (
   </div>
 );
 
-const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
+const ProtectedRoute = ({ children, adminOnly = false, staffOnly = false }: { children: React.ReactNode, adminOnly?: boolean, staffOnly?: boolean }) => {
   const { user, profile, loading } = useAuth();
 
   if (loading) return <MiniLoader />;
   if (!user || !profile) return <Navigate to="/" replace />;
   if (adminOnly && profile.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  // Staff area: admins, professors, or members granted championship management.
+  if (staffOnly && profile.role !== 'admin' && profile.role !== 'professor' && !profile.canManageChampionships) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 };
@@ -140,7 +144,7 @@ const AppContent = () => {
                 <Route path="/login" element={<AuthenticatedRedirect><Login /></AuthenticatedRedirect>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute staffOnly><Admin /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </FooterAware>
