@@ -132,8 +132,10 @@ service cloud.firestore {
 
     function canManageChampionships() {
       return isAdmin() || (
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canManageChampionships == true
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canManageChampionships == true ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor'
+        )
       );
     }
 
