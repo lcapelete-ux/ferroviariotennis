@@ -22,6 +22,11 @@ export default function Admin() {
   const isSystemAdmin = profile?.role === 'admin' || user?.email === 'tennisffc2@gmail.com';
   // Anyone allowed to manage championships: system admins, professors, or members granted the flag.
   const canManage = isSystemAdmin || profile?.role === 'professor' || !!profile?.canManageChampionships;
+  // Safe date formatter — a missing/invalid date must never crash the admin screen.
+  const fmt = (v?: string, pattern = 'dd/MM/yyyy') => {
+    if (!v) return '—';
+    try { const d = parseISO(v); return isNaN(d.getTime()) ? '—' : format(d, pattern); } catch { return '—'; }
+  };
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [alerts, setAlerts] = useState<AdminAlert[]>([]);
@@ -2096,143 +2101,162 @@ export default function Admin() {
           </div>
         )}
         {canManage && activeTab === 'championships' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-zinc-800">Gerenciar Campeonatos Internos</h2>
-              <button
-                onClick={() => setIsCreatingChampionship(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm"
-              >
-                <Plus className="w-5 h-5" />
-                Novo Campeonato
-              </button>
+          <div className="space-y-5">
+            <div className="flex justify-between items-center gap-3 flex-wrap">
+              <div>
+                <h2 className="text-xl font-black text-zinc-900">Campeonatos</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">{championships.length} {championships.length === 1 ? 'campeonato' : 'campeonatos'} · monte chaves, inscreva e lance resultados</p>
+              </div>
+              {isSystemAdmin && (
+                <button
+                  onClick={() => setIsCreatingChampionship(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                >
+                  <Plus className="w-5 h-5" />
+                  Novo Campeonato
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {championships.map(champ => (
-                <div key={champ.id} className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden flex flex-col">
-                  <div className="p-5 flex-grow">
-                    <div className="flex justify-between items-start mb-3">
-                      <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                        champ.status === 'open' ? 'bg-emerald-100 text-emerald-700' :
-                        champ.status === 'closed' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-700'
-                      }`}>
-                        {champ.status === 'open' ? 'Inscrições Abertas' :
-                         champ.status === 'closed' ? 'Inscrições Encerradas' : 'Finalizado'}
-                      </span>
-                      <span className="text-xs font-medium text-zinc-500">
-                        {champ.type === 'singles' ? 'Simples' : 'Duplas'}
-                      </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {championships.map(champ => {
+                const hasBracket = championshipMatches.some(m => m.championshipId === champ.id);
+                const regCount = championshipRegistrations.filter(r => r.championshipId === champ.id && !r.isDrawn && r.status !== 'cancelled').length;
+                return (
+                  <div key={champ.id} className="bg-white rounded-3xl shadow-sm border border-zinc-100 overflow-hidden flex flex-col">
+                    {/* Dark header */}
+                    <div className="bg-zinc-900 p-5">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                          champ.status === 'open' ? 'bg-emerald-500 text-white' :
+                          champ.status === 'closed' ? 'bg-amber-400 text-amber-900' : 'bg-zinc-700 text-zinc-300'
+                        }`}>
+                          {champ.status === 'open' ? 'Inscrições Abertas' : champ.status === 'closed' ? 'Encerrado' : 'Finalizado'}
+                        </span>
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest shrink-0">
+                          {champ.type === 'singles' ? 'Simples' : champ.isDrawnPairs ? 'Duplas Sorteadas' : 'Duplas'}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-black text-white leading-tight">{champ.title}</h3>
                     </div>
-                    <h3 className="text-lg font-bold text-zinc-900 mb-2">{champ.title}</h3>
-                    <p className="text-sm text-zinc-600 line-clamp-2 mb-4">{champ.description}</p>
-                    
-                    <div className="space-y-2 text-xs text-zinc-500">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-zinc-400" />
-                        <span>Início Inscrição: {format(parseISO(champ.registrationStartDate), 'dd/MM/yyyy HH:mm')}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500" />
-                        <span>Fim Inscrição: {format(parseISO(champ.registrationDeadline), 'dd/MM/yyyy HH:mm')}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-zinc-400" />
-                        <span>Torneio: {format(parseISO(champ.startDate), 'dd/MM/yyyy')} - {format(parseISO(champ.endDate), 'dd/MM/yyyy')}</span>
-                      </div>
-                      {champ.isDrawnPairs && (
-                        <div className="flex items-center gap-2 text-emerald-600 font-bold">
-                          <Users className="w-4 h-4" />
-                          <span>Duplas Sorteadas</span>
+
+                    {/* Body: compact info */}
+                    <div className="p-5 flex-grow space-y-3">
+                      {champ.description && <p className="text-sm text-zinc-500 line-clamp-2">{champ.description}</p>}
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-zinc-50 rounded-xl py-2 px-1 border border-zinc-100">
+                          <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Período</p>
+                          <p className="text-[11px] font-bold text-zinc-700">{fmt(champ.startDate, 'dd/MM')}–{fmt(champ.endDate, 'dd/MM')}</p>
                         </div>
-                      )}
+                        <div className="bg-zinc-50 rounded-xl py-2 px-1 border border-zinc-100">
+                          <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Inscritos</p>
+                          <p className="text-[11px] font-black text-emerald-700">{regCount}</p>
+                        </div>
+                        <div className="bg-zinc-50 rounded-xl py-2 px-1 border border-zinc-100">
+                          <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Prazo</p>
+                          <p className="text-[11px] font-bold text-zinc-700">{fmt(champ.registrationDeadline, 'dd/MM HH:mm')}</p>
+                        </div>
+                      </div>
                       {champ.organizerName && (
-                        <div className="flex items-center gap-2 text-violet-600 font-bold">
-                          <Users className="w-4 h-4" />
-                          <span>Organizador: {champ.organizerName}</span>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-violet-600 bg-violet-50 rounded-lg px-3 py-1.5 border border-violet-100">
+                          <Users className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Organizador: {champ.organizerName}</span>
                         </div>
                       )}
                     </div>
-                  </div>
-                  
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex flex-wrap gap-2">
-                    <select
-                      value={champ.status}
-                      onChange={(e) => handleUpdateChampionshipStatus(champ.id, e.target.value as any)}
-                      className="flex-1 min-w-[130px] text-xs border-zinc-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 py-1.5"
-                    >
-                      <option value="open">Abrir Inscrições</option>
-                      <option value="closed">Fechar Inscrições</option>
-                      <option value="finished">Finalizar</option>
-                    </select>
-                    {championshipMatches.some(m => m.championshipId === champ.id) ? (
-                      <button
-                        onClick={() => setViewingBracket(champ.id)}
-                        className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 border border-emerald-100"
-                      >
-                        Ver Chaves
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleOpenManualBracket(champ.id)}
-                          className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 border border-emerald-100 whitespace-nowrap"
-                          title="Definir manualmente quem joga contra quem"
+
+                    {/* Actions */}
+                    <div className="border-t border-zinc-100 p-4 space-y-3 bg-zinc-50/60">
+                      <div>
+                        <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Situação</label>
+                        <select
+                          value={champ.status}
+                          onChange={(e) => handleUpdateChampionshipStatus(champ.id, e.target.value as any)}
+                          className="w-full text-xs font-bold text-zinc-700 border-zinc-200 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 py-2 bg-white"
                         >
-                          Montar Chaves
-                        </button>
-                        <button
-                          onClick={() => handleGenerateBracketPreview(champ.id)}
-                          className="px-3 py-1.5 text-xs font-bold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 border border-zinc-200 whitespace-nowrap"
-                          title="Sorteio aleatório"
-                        >
-                          Sortear
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => setViewingRegistrants(champ.id)}
-                      className="px-3 py-1.5 text-xs font-bold text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 border border-violet-100 flex items-center gap-1 font-black uppercase tracking-wider"
-                      title="Visualizar Inscritos"
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      Inscritos
-                    </button>
-                    <button
-                      onClick={() => setViewingPayments(champ.id)}
-                      className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 border border-blue-100 flex items-center gap-1"
-                      title="Gerenciar Pagamentos"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Pagamentos
-                    </button>
-                    {isSystemAdmin && (
-                      <button
-                        onClick={() => { setDesignatingOrganizer(champ.id); setOrganizerPick(champ.organizerId || ''); }}
-                        className="px-3 py-1.5 text-xs font-bold text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 border border-violet-100 flex items-center gap-1 whitespace-nowrap"
-                        title="Designar quem ajuda a organizar"
-                      >
-                        <Users className="w-4 h-4" />
-                        Organizador
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteChampionship(champ.id)}
-                      className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 border border-red-100 flex items-center gap-1 whitespace-nowrap"
-                      title="Excluir campeonato"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Excluir
-                    </button>
+                          <option value="open">Abrir Inscrições</option>
+                          <option value="closed">Fechar Inscrições</option>
+                          <option value="finished">Finalizar</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Chaves</label>
+                        {hasBracket ? (
+                          <button
+                            onClick={() => setViewingBracket(champ.id)}
+                            className="w-full py-2.5 text-xs font-black uppercase tracking-widest text-white bg-zinc-900 rounded-xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                          >
+                            <Trophy className="w-3.5 h-3.5 text-amber-400" /> Ver / Editar Chaves
+                          </button>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleOpenManualBracket(champ.id)}
+                              className="py-2.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-100 active:scale-95 transition-all"
+                              title="Definir manualmente quem joga contra quem"
+                            >
+                              Montar Chaves
+                            </button>
+                            <button
+                              onClick={() => handleGenerateBracketPreview(champ.id)}
+                              className="py-2.5 text-xs font-bold text-zinc-700 bg-white rounded-xl hover:bg-zinc-100 border border-zinc-200 active:scale-95 transition-all"
+                              title="Sorteio aleatório"
+                            >
+                              Sortear
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Gestão</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => setViewingRegistrants(champ.id)}
+                            className="py-2.5 text-xs font-bold text-violet-700 bg-violet-50 rounded-xl hover:bg-violet-100 border border-violet-100 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                            title="Ver / cadastrar inscritos"
+                          >
+                            <Users className="w-3.5 h-3.5" /> Inscritos
+                          </button>
+                          {isSystemAdmin && (
+                            <button
+                              onClick={() => handleDeleteChampionship(champ.id)}
+                              className="py-2.5 text-xs font-bold text-red-700 bg-red-50 rounded-xl hover:bg-red-100 border border-red-100 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                              title="Excluir campeonato"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Excluir
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setViewingPayments(champ.id)}
+                            className="py-2.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-xl hover:bg-blue-100 border border-blue-100 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                            title="Gerenciar pagamentos"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> Pagamentos
+                          </button>
+                          {isSystemAdmin && (
+                            <button
+                              onClick={() => { setDesignatingOrganizer(champ.id); setOrganizerPick(champ.organizerId || ''); }}
+                              className="py-2.5 text-xs font-bold text-zinc-700 bg-white rounded-xl hover:bg-zinc-100 border border-zinc-200 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                              title="Designar quem ajuda a organizar"
+                            >
+                              <Users className="w-3.5 h-3.5" /> Organizador
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            
+
             {championships.length === 0 && (
-              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-zinc-300">
+              <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-zinc-200">
                 <Trophy className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
-                <p className="text-zinc-500">Nenhum campeonato criado ainda.</p>
+                <p className="font-black text-zinc-400">Nenhum campeonato criado ainda.</p>
+                {isSystemAdmin && <p className="text-sm text-zinc-400 mt-1">Clique em "Novo Campeonato" para começar.</p>}
               </div>
             )}
           </div>
