@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { UserProfile, Booking, Championship, ChampionshipRegistration, ChampionshipMatch } from '../types';
 import { format, addDays, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Shield, Users, Calendar as CalendarIcon, AlertTriangle, Download, Trophy, ArrowRight, ArrowLeft, Trash2, FileText, Bell, CheckCircle, Plus, X, ShieldAlert, AlertCircle, Settings } from 'lucide-react';
+import { Shield, Users, Calendar as CalendarIcon, AlertTriangle, Download, Trophy, ArrowRight, ArrowLeft, Trash2, FileText, Bell, CheckCircle, Plus, X, ShieldAlert, AlertCircle, Settings, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
@@ -14,6 +14,63 @@ import { AdminAlert, MaintenanceReport } from '../types';
 import clsx from 'clsx';
 
 import { useSettings } from '../context/SettingsContext';
+
+// Searchable member picker — a plain <select> becomes unusable once the club
+// has more than a handful of members (no way to filter, easy to lose track of
+// which name you're on). Type to filter; click a result to select it.
+function MemberPicker({ users, value, onChange, placeholder, excludeUid }: {
+  users: UserProfile[];
+  value: string;
+  onChange: (uid: string) => void;
+  placeholder: string;
+  excludeUid?: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const selected = users.find(u => u.uid === value);
+  const pool = users.filter(u => u.uid !== excludeUid).sort((a, b) => a.fullName.localeCompare(b.fullName));
+  const filtered = query.trim()
+    ? pool.filter(u => u.fullName.toLowerCase().includes(query.trim().toLowerCase()))
+    : pool;
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+        <input
+          type="text"
+          value={open ? query : (selected?.fullName || '')}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); if (!e.target.value) onChange(''); }}
+          onFocus={() => { setQuery(''); setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder}
+          className="w-full pl-9 pr-3 py-2 border border-zinc-300 rounded-xl bg-white text-sm font-medium focus:ring-emerald-500 focus:border-emerald-500"
+        />
+      </div>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-zinc-200 rounded-xl shadow-lg">
+          {filtered.length === 0 && (
+            <p className="px-3 py-2 text-xs text-zinc-400 italic">Nenhum sócio encontrado.</p>
+          )}
+          {filtered.map(u => (
+            <button
+              key={u.uid}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onChange(u.uid); setQuery(''); setOpen(false); }}
+              className={clsx(
+                "w-full text-left px-3 py-2 text-sm font-medium transition-colors",
+                u.uid === value ? "bg-emerald-50 text-emerald-700" : "text-zinc-700 hover:bg-zinc-50"
+              )}
+            >
+              {u.fullName}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Admin() {
   const { profile, user } = useAuth();
@@ -953,10 +1010,14 @@ export default function Admin() {
       await setDoc(ref, reg);
       setManualRegUser1('');
       setManualRegUser2('');
-      showAlert("Sucesso", "Participante inscrito!", "success");
+      showAlert("Sucesso", `${u1.fullName}${u2 ? ' / ' + u2.fullName : ''} inscrito(a)!`, "success");
     } catch (error: any) {
       console.error('Error adding manual registration:', error);
-      showAlert("Erro", error?.message || String(error), "error");
+      const code = error?.code || '';
+      const msg = code === 'permission-denied'
+        ? 'Permissão negada pelo Firestore ao inscrever. Confirme que as regras foram publicadas e que você tem permissão de gerenciar campeonatos.'
+        : (error?.message || String(error));
+      showAlert("Erro ao inscrever", msg, "error");
     }
   };
 
@@ -2662,149 +2723,154 @@ export default function Admin() {
         </div>
       )}
 
-      {viewingBracket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl p-8 border border-zinc-100 my-8">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-3 sm:gap-4">
-              <div className="min-w-0 sm:flex-1">
-                <h3 className="text-lg sm:text-2xl font-black text-zinc-900 truncate">
-                  Chaves do Campeonato: {championships.find(c => c.id === viewingBracket)?.title}
-                </h3>
-                <p className="text-sm text-zinc-500 mt-1">Gerencie os placares e acompanhe o progresso do torneio.</p>
-              </div>
-              <div className="flex gap-2 sm:gap-3 shrink-0">
+      {viewingBracket && (() => {
+        const champ = championships.find(c => c.id === viewingBracket);
+        const totalRounds = bracketRoundsFor(viewingBracket);
+        const getRoundLabel = (round: number) => {
+          if (round === totalRounds) return 'Final';
+          if (round === totalRounds - 1 && totalRounds > 2) return 'Semi-Final';
+          if (round === 1) return '1ª Rodada';
+          return `${round}ª Rodada`;
+        };
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col bg-white">
+            {/* Sticky header — always reachable, never scrolls away */}
+            <div
+              className="shrink-0 border-b border-zinc-100 bg-white z-10"
+              style={{ paddingTop: 'max(10px, env(safe-area-inset-top))' }}
+            >
+              <div className="flex items-center gap-2 px-3 sm:px-5 py-3">
+                <button
+                  onClick={() => setViewingBracket(null)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 transition-all active:scale-95 shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4 text-zinc-700" />
+                  <span className="text-xs font-black text-zinc-700 uppercase tracking-widest hidden sm:inline">Voltar</span>
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Chaves do Torneio</p>
+                  <h3 className="text-sm sm:text-base font-black text-zinc-900 truncate">{champ?.title}</h3>
+                </div>
                 <button
                   onClick={() => handleResetBracket(viewingBracket)}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all whitespace-nowrap"
+                  className="px-2.5 sm:px-3 py-2 text-[10px] sm:text-xs font-bold text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all whitespace-nowrap shrink-0"
+                  title="Apagar chaves e sorteios"
                 >
-                  Resetar Chaves
-                </button>
-                <button onClick={() => setViewingBracket(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0">
-                  <X className="w-6 h-6 sm:w-8 sm:h-8" />
+                  Resetar
                 </button>
               </div>
             </div>
 
-            <div className="flex gap-12 overflow-x-auto pb-8 min-h-[600px]">
-              {Array.from({ length: bracketRoundsFor(viewingBracket) }).map((_, roundIdx) => {
-                const round = roundIdx + 1;
-                const matchesInRound = championshipMatches
-                  .filter(m => m.championshipId === viewingBracket && m.round === round)
-                  .sort((a, b) => a.matchNumber - b.matchNumber);
+            {/* Scrollable bracket */}
+            <div className="flex-1 overflow-auto" style={{ WebkitOverflowScrolling: 'touch' as any }}>
+              <div className="flex gap-3 sm:gap-6 p-3 sm:p-6" style={{ width: 'max-content', minHeight: '100%' }}>
+                {Array.from({ length: totalRounds }).map((_, roundIdx) => {
+                  const round = roundIdx + 1;
+                  const isFinal = round === totalRounds;
+                  const matchesInRound = championshipMatches
+                    .filter(m => m.championshipId === viewingBracket && m.round === round)
+                    .sort((a, b) => a.matchNumber - b.matchNumber);
 
-                return (
-                  <div key={round} className="flex flex-col gap-8 min-w-[250px]">
-                    <h4 className="text-center font-black text-zinc-400 uppercase tracking-widest text-xs mb-4">
-                      {round === 1 ? 'Primeira Rodada' :
-                       round === bracketRoundsFor(viewingBracket) ? 'Final' :
-                       `Rodada ${round}`}
-                    </h4>
-                    <div className="flex flex-col justify-around flex-grow gap-8">
-                      {matchesInRound.map(match => (
-                        <div key={match.id} className="bg-zinc-50 border-2 border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-                          <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white">
-                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jogo {match.matchNumber + 1}</span>
-                            {match.status === 'finished' && (
-                              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full">Finalizado</span>
-                            )}
-                          </div>
-                          
-                          <div className="p-4 space-y-4">
-                            <div className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-3 flex-grow">
-                                <input
-                                  type="radio"
-                                  name={`winner-${match.id}`}
-                                  checked={match.winnerId === match.participant1Id && match.status === 'finished'}
-                                  onChange={() => {
-                                    const newMatches = [...championshipMatches];
-                                    const idx = newMatches.findIndex(m => m.id === match.id);
-                                    newMatches[idx].winnerId = match.participant1Id;
-                                    setChampionshipMatches(newMatches);
-                                  }}
-                                  className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-                                  disabled={match.status === 'finished' || !match.participant1Id || !match.participant2Id}
-                                />
-                                <span className={clsx(
-                                  "text-sm font-bold truncate",
-                                  match.winnerId === match.participant1Id && match.winnerId ? "text-emerald-600" : "text-zinc-700",
-                                  !match.participant1Name && "text-zinc-300 italic"
-                                )}>
-                                  {match.participant1Name || 'Aguardando...'}
-                                </span>
+                  return (
+                    <div key={round} className="flex flex-col gap-4 w-[220px] sm:w-[250px] shrink-0">
+                      <h4 className={clsx(
+                        "text-center font-black uppercase tracking-widest text-[10px] py-1.5 rounded-full",
+                        isFinal ? "bg-amber-100 text-amber-700" : "text-zinc-400"
+                      )}>
+                        {getRoundLabel(round)}
+                      </h4>
+                      <div className="flex flex-col justify-around flex-grow gap-4">
+                        {matchesInRound.length > 0 ? matchesInRound.map(match => {
+                          const bothPresent = !!(match.participant1Id && match.participant2Id);
+                          const done = match.status === 'finished';
+                          return (
+                            <div key={match.id} className="bg-zinc-50 border-2 border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                              <div className="px-3 py-2 border-b border-zinc-200 flex justify-between items-center bg-white">
+                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Jogo {match.matchNumber + 1}</span>
+                                {done && (
+                                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full">✓ Finalizado</span>
+                                )}
                               </div>
-                              <input
-                                type="text"
-                                value={match.score1 || ''}
-                                onChange={(e) => {
-                                  const newMatches = [...championshipMatches];
-                                  const idx = newMatches.findIndex(m => m.id === match.id);
-                                  newMatches[idx].score1 = e.target.value;
-                                  setChampionshipMatches(newMatches);
-                                }}
-                                className="w-20 h-10 text-center font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:ring-0"
-                                placeholder="Placar"
-                                disabled={!match.participant1Id || !match.participant2Id}
-                              />
-                            </div>
-                            
-                            <div className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-3 flex-grow">
-                                <input
-                                  type="radio"
-                                  name={`winner-${match.id}`}
-                                  checked={match.winnerId === match.participant2Id && match.status === 'finished'}
-                                  onChange={() => {
-                                    const newMatches = [...championshipMatches];
-                                    const idx = newMatches.findIndex(m => m.id === match.id);
-                                    newMatches[idx].winnerId = match.participant2Id;
-                                    setChampionshipMatches(newMatches);
-                                  }}
-                                  className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-                                  disabled={match.status === 'finished' || !match.participant1Id || !match.participant2Id}
-                                />
-                                <span className={clsx(
-                                  "text-sm font-bold truncate",
-                                  match.winnerId === match.participant2Id && match.winnerId ? "text-emerald-600" : "text-zinc-700",
-                                  !match.participant2Name && "text-zinc-300 italic"
-                                )}>
-                                  {match.participant2Name || 'Aguardando...'}
-                                </span>
-                              </div>
-                              <input
-                                type="text"
-                                value={match.score2 || ''}
-                                onChange={(e) => {
-                                  const newMatches = [...championshipMatches];
-                                  const idx = newMatches.findIndex(m => m.id === match.id);
-                                  newMatches[idx].score2 = e.target.value;
-                                  setChampionshipMatches(newMatches);
-                                }}
-                                className="w-20 h-10 text-center font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:ring-0"
-                                placeholder="Placar"
-                                disabled={!match.participant1Id || !match.participant2Id}
-                              />
-                            </div>
 
-                            {match.participant1Id && match.participant2Id && match.status === 'pending' && (
-                              <button
-                                onClick={() => handleUpdateMatchScore(match, match.score1 || '0', match.score2 || '0', match.winnerId)}
-                                className="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all mt-2"
-                              >
-                                Salvar Resultado
-                              </button>
-                            )}
+                              <div className="p-3 space-y-2">
+                                {[
+                                  { id: match.participant1Id, name: match.participant1Name, score: match.score1, key: 'score1' as const },
+                                  { id: match.participant2Id, name: match.participant2Name, score: match.score2, key: 'score2' as const },
+                                ].map((p, i) => {
+                                  const isWinner = !!(match.winnerId && match.winnerId === p.id);
+                                  return (
+                                    <div
+                                      key={i}
+                                      onClick={() => {
+                                        if (!bothPresent) return;
+                                        const newMatches = [...championshipMatches];
+                                        const idx = newMatches.findIndex(m => m.id === match.id);
+                                        newMatches[idx] = { ...newMatches[idx], winnerId: p.id };
+                                        setChampionshipMatches(newMatches);
+                                      }}
+                                      className={clsx(
+                                        "flex items-center gap-2 rounded-xl px-2.5 py-2 border-2 transition-all",
+                                        bothPresent ? "cursor-pointer" : "cursor-default",
+                                        isWinner ? "bg-emerald-50 border-emerald-400" : "bg-white border-transparent"
+                                      )}
+                                    >
+                                      <span className={clsx(
+                                        "text-xs font-bold flex-1 min-w-0 truncate",
+                                        isWinner ? "text-emerald-700" : p.name ? "text-zinc-700" : "text-zinc-300 italic"
+                                      )}>
+                                        {p.name || 'Aguardando...'}
+                                      </span>
+                                      <input
+                                        type="text"
+                                        value={p.score || ''}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                          const newMatches = [...championshipMatches];
+                                          const idx = newMatches.findIndex(m => m.id === match.id);
+                                          newMatches[idx] = { ...newMatches[idx], [p.key]: e.target.value };
+                                          setChampionshipMatches(newMatches);
+                                        }}
+                                        className="w-11 h-9 text-center text-sm font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-lg focus:border-emerald-500 focus:ring-0 shrink-0"
+                                        placeholder="—"
+                                        disabled={!bothPresent}
+                                      />
+                                    </div>
+                                  );
+                                })}
+
+                                {bothPresent && (
+                                  <button
+                                    onClick={() => handleUpdateMatchScore(match, match.score1 || '0', match.score2 || '0', match.winnerId)}
+                                    className={clsx(
+                                      "w-full py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95",
+                                      done ? "bg-zinc-100 text-zinc-500 hover:bg-zinc-200" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                    )}
+                                  >
+                                    {done ? 'Editar Resultado' : 'Salvar Resultado'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }) : (
+                          <div className="rounded-2xl p-4 text-center bg-zinc-50 border-2 border-dashed border-zinc-200">
+                            <p className="text-xs font-bold text-zinc-300">Aguardando</p>
                           </div>
-                        </div>
-                      ))}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom hint */}
+            <div className="shrink-0 text-center py-2.5 border-t border-zinc-100" style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
+              <p className="text-[10px] font-bold text-zinc-300">← Deslize para ver todas as rodadas →</p>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {activeTab === 'visitors' && (
         <div className="space-y-6">
@@ -3017,20 +3083,24 @@ export default function Admin() {
         </div>
       )}
 
-      {viewingRegistrants && (
+      {viewingRegistrants && (() => {
+        const champ = championships.find(c => c.id === viewingRegistrants);
+        const regsHere = championshipRegistrations.filter(r => r.championshipId === viewingRegistrants && !r.isDrawn && r.status !== 'cancelled');
+        const isDoublesManual = champ?.type === 'doubles' && !champ?.isDrawnPairs;
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl p-8 border border-zinc-100 my-8">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl p-6 sm:p-8 border border-zinc-100 my-8">
+            <div className="flex justify-between items-start gap-4 mb-6">
+              <div className="min-w-0">
+                <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight">
                   Inscritos no Campeonato
                 </h3>
-                <p className="text-sm text-zinc-500 mt-1">
-                  Campeonato: <span className="font-bold text-zinc-800">{championships.find(c => c.id === viewingRegistrants)?.title}</span>
+                <p className="text-sm text-zinc-500 mt-1 truncate">
+                  <span className="font-bold text-zinc-800">{champ?.title}</span> · <span className="font-black text-emerald-600">{regsHere.length}</span> inscrito{regsHere.length === 1 ? '' : 's'}
                 </p>
               </div>
-              <button onClick={() => setViewingRegistrants(null)} className="text-zinc-400 hover:text-zinc-650">
-                <X className="w-8 h-8" />
+              <button onClick={() => setViewingRegistrants(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0">
+                <X className="w-7 h-7" />
               </button>
             </div>
 
@@ -3038,36 +3108,31 @@ export default function Admin() {
             <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-4 mb-4">
               <p className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-3">Cadastrar participante manualmente</p>
               <div className="flex flex-col sm:flex-row gap-2">
-                <select
+                <MemberPicker
+                  users={users}
                   value={manualRegUser1}
-                  onChange={(e) => setManualRegUser1(e.target.value)}
-                  className="flex-1 min-w-0 px-3 py-2 border border-zinc-300 rounded-xl bg-white text-sm font-medium focus:ring-emerald-500 focus:border-emerald-500"
-                >
-                  <option value="">Selecione o sócio...</option>
-                  {users.slice().sort((a, b) => a.fullName.localeCompare(b.fullName)).map(u => (
-                    <option key={u.uid} value={u.uid}>{u.fullName}</option>
-                  ))}
-                </select>
-                {championships.find(c => c.id === viewingRegistrants)?.type === 'doubles' &&
-                 !championships.find(c => c.id === viewingRegistrants)?.isDrawnPairs && (
-                  <select
+                  onChange={setManualRegUser1}
+                  placeholder="Buscar sócio..."
+                />
+                {isDoublesManual && (
+                  <MemberPicker
+                    users={users}
                     value={manualRegUser2}
-                    onChange={(e) => setManualRegUser2(e.target.value)}
-                    className="flex-1 min-w-0 px-3 py-2 border border-zinc-300 rounded-xl bg-white text-sm font-medium focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value="">Parceiro (dupla)...</option>
-                    {users.filter(u => u.uid !== manualRegUser1).slice().sort((a, b) => a.fullName.localeCompare(b.fullName)).map(u => (
-                      <option key={u.uid} value={u.uid}>{u.fullName}</option>
-                    ))}
-                  </select>
+                    onChange={setManualRegUser2}
+                    placeholder="Buscar parceiro (dupla)..."
+                    excludeUid={manualRegUser1}
+                  />
                 )}
                 <button
                   onClick={handleAddManualRegistration}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shrink-0 flex items-center justify-center gap-1.5"
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shrink-0 flex items-center justify-center gap-1.5 active:scale-95"
                 >
                   <Plus className="w-4 h-4" /> Inscrever
                 </button>
               </div>
+              {isDoublesManual && (
+                <p className="text-[10px] text-emerald-700/70 mt-2">Deixe o parceiro em branco para inscrever só 1 jogador (aguardando dupla).</p>
+              )}
             </div>
 
             <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden overflow-x-auto">
@@ -3082,9 +3147,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
-                  {championshipRegistrations
-                    .filter(r => r.championshipId === viewingRegistrants && !r.isDrawn && r.status !== 'cancelled')
-                    .map(reg => (
+                  {regsHere.map(reg => (
                       <tr key={reg.id} className="bg-white hover:bg-zinc-50 transition-colors">
                         <td className="px-6 py-4 font-bold text-zinc-900">
                           {reg.userName1}
@@ -3098,7 +3161,7 @@ export default function Admin() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center text-xs font-mono text-zinc-500">
-                          {reg.created_at ? format(parseISO(reg.created_at), 'dd/MM/yyyy HH:mm') : 'N/A'}
+                          {fmt(reg.created_at, 'dd/MM/yyyy HH:mm')}
                         </td>
                         <td className="px-4 py-4 text-center">
                           <button
@@ -3111,7 +3174,7 @@ export default function Admin() {
                         </td>
                       </tr>
                     ))}
-                  {championshipRegistrations.filter(r => r.championshipId === viewingRegistrants && !r.isDrawn && r.status !== 'cancelled').length === 0 && (
+                  {regsHere.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 italic">
                         Nenhum inscrito confirmado neste campeonato ainda.
@@ -3132,7 +3195,8 @@ export default function Admin() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {bracketSimulation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto w-full">
