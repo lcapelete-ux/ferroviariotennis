@@ -3088,24 +3088,28 @@ export default function Admin() {
         const regsHere = championshipRegistrations.filter(r => r.championshipId === viewingRegistrants && !r.isDrawn && r.status !== 'cancelled');
         const isDoublesManual = champ?.type === 'doubles' && !champ?.isDrawnPairs;
         return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl p-6 sm:p-8 border border-zinc-100 my-8">
-            <div className="flex justify-between items-start gap-4 mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm">
+          {/* Fixed-height column: header + form are pinned, only the registrant
+              list scrolls — so the modal never grows past the screen no matter
+              how many players are registered. */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl w-full max-w-2xl border border-zinc-100 flex flex-col max-h-[95vh] sm:max-h-[88vh]">
+            {/* Header — shrink-0 */}
+            <div className="shrink-0 flex justify-between items-start gap-4 p-4 sm:p-6 border-b border-zinc-100">
               <div className="min-w-0">
-                <h3 className="text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight">
-                  Inscritos no Campeonato
+                <h3 className="text-lg sm:text-xl font-black text-zinc-900 uppercase tracking-tight">
+                  Inscritos
                 </h3>
-                <p className="text-sm text-zinc-500 mt-1 truncate">
+                <p className="text-xs sm:text-sm text-zinc-500 mt-0.5 truncate">
                   <span className="font-bold text-zinc-800">{champ?.title}</span> · <span className="font-black text-emerald-600">{regsHere.length}</span> inscrito{regsHere.length === 1 ? '' : 's'}
                 </p>
               </div>
-              <button onClick={() => setViewingRegistrants(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0">
-                <X className="w-7 h-7" />
+              <button onClick={() => setViewingRegistrants(null)} className="text-zinc-400 hover:text-zinc-600 shrink-0 p-1 -m-1">
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Manual registration — enter a member (or pair) by hand */}
-            <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-4 mb-4">
+            {/* Manual registration — shrink-0, always pinned, never scrolls out of view */}
+            <div className="shrink-0 bg-emerald-50 border-b border-emerald-100 p-4">
               <p className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-3">Cadastrar participante manualmente</p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <MemberPicker
@@ -3135,57 +3139,41 @@ export default function Admin() {
               )}
             </div>
 
-            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 overflow-hidden overflow-x-auto">
-              <table className="w-full text-left min-w-[520px]">
-                <thead className="bg-zinc-100 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">Jogador 1 / Sócio</th>
-                    <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest">Jogador 2 / Parceiro</th>
-                    <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest text-center">Tipo</th>
-                    <th className="px-6 py-4 text-xs font-black text-zinc-500 uppercase tracking-widest text-center">Data Inscrição</th>
-                    <th className="px-4 py-4"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
+            {/* Registrant list — the ONLY part that scrolls, regardless of count */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {regsHere.length === 0 ? (
+                <div className="px-6 py-16 text-center text-zinc-400 italic text-sm">
+                  Nenhum inscrito confirmado neste campeonato ainda.
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-100">
                   {regsHere.map(reg => (
-                      <tr key={reg.id} className="bg-white hover:bg-zinc-50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-zinc-900">
+                    <div key={reg.id} className="flex items-center gap-3 px-4 sm:px-6 py-3 hover:bg-zinc-50 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm text-zinc-900 truncate">
                           {reg.userName1}
-                        </td>
-                        <td className="px-6 py-4 text-zinc-700 font-medium">
-                          {reg.userName2 || <span className="text-zinc-400 italic font-normal">Nenhum (Individual)</span>}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-xs font-bold text-zinc-650 bg-zinc-100 px-2.5 py-1 rounded-md">
-                            {reg.userName2 ? 'Dupla' : 'Simples'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center text-xs font-mono text-zinc-500">
-                          {fmt(reg.created_at, 'dd/MM/yyyy HH:mm')}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <button
-                            onClick={() => handleDeleteRegistration(reg.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Remover inscrição"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  {regsHere.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 italic">
-                        Nenhum inscrito confirmado neste campeonato ainda.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                          {reg.userName2 && <span className="text-zinc-400 font-medium"> / {reg.userName2}</span>}
+                        </p>
+                        <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{fmt(reg.created_at, 'dd/MM/yyyy HH:mm')}</p>
+                      </div>
+                      <span className="text-[9px] font-black text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md shrink-0 uppercase tracking-wider whitespace-nowrap">
+                        {reg.userName2 ? 'Dupla' : 'Simples'}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteRegistration(reg.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                        title="Remover inscrição"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            {/* Footer — shrink-0, always reachable */}
+            <div className="shrink-0 flex justify-end p-4 border-t border-zinc-100" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
               <button
                 onClick={() => setViewingRegistrants(null)}
                 className="px-5 py-2.5 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all"
