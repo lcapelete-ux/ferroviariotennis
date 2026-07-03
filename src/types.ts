@@ -92,6 +92,11 @@ export interface ChampionshipRegistration {
   created_at: string;
 }
 
+export interface SetScore {
+  p1: string;
+  p2: string;
+}
+
 export interface ChampionshipMatch {
   id: string;
   championshipId: string;
@@ -101,12 +106,14 @@ export interface ChampionshipMatch {
   participant2Id?: string; // registrationId
   participant1Name?: string;
   participant2Name?: string;
-  score1?: string;
-  score2?: string;
+  sets?: SetScore[]; // up to 3 sets — the 3rd is a match tiebreak (first to 10)
+  score1?: string; // summary: sets won by participant1 (kept for compact display/back-compat)
+  score2?: string; // summary: sets won by participant2
   winnerId?: string; // registrationId
   nextMatchId?: string;
   status: 'pending' | 'finished';
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ClubSettings {

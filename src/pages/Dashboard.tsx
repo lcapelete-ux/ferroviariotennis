@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Booking, UserProfile, Championship, ChampionshipRegistration, ChampionshipMatch } from '../types';
+import { Booking, UserProfile, Championship, ChampionshipRegistration, ChampionshipMatch, SetScore } from '../types';
 import { format, startOfWeek, addDays, isSameDay, parseISO, setHours, setMinutes, isBefore, addMinutes, isAfter, getDay, isWithinInterval, addHours, subHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { isBookingOpen, getAvailableSlots, isDoublesOnly, calculateEndTime, getBookingLimit, isFridayOpenPlay as checkFridayOpenPlay } from '../utils/bookingRules';
+import { setWinner, matchWinnerFromSets, needsThirdSet, trimSets, formatSetsScore, setsWonCount } from '../utils/tennisScore';
 import { LogOut, User as UserIcon, Users, Calendar, Info, Clock, AlertCircle, Check, X, CalendarCheck, GraduationCap, Edit2, Trash2, LayoutGrid, List, CalendarDays, UserCheck, Bell, BellRing, Smartphone, Trophy, UserPlus, Shield, Share2, RefreshCw, Menu, ChevronLeft, ChevronRight, Wrench, FileText } from 'lucide-react';
 import { logout, auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDocs, query, where, orderBy, limit, getDoc, writeBatch } from 'firebase/firestore';
@@ -61,9 +62,9 @@ export default function Dashboard() {
   const [championshipMatches, setChampionshipMatches] = useState<ChampionshipMatch[]>([]);
   const [viewingBracket, setViewingBracket] = useState<string | null>(null);
   // Score entry: a participant (or admin) marking the result of their own match.
+  // Best of 3 sets — the 3rd (when needed) is a match tiebreak.
   const [scoringMatch, setScoringMatch] = useState<ChampionshipMatch | null>(null);
-  const [scoreInputA, setScoreInputA] = useState('');
-  const [scoreInputB, setScoreInputB] = useState('');
+  const [scoreSets, setScoreSets] = useState<SetScore[]>([{ p1: '', p2: '' }, { p1: '', p2: '' }, { p1: '', p2: '' }]);
   const [scoreWinner, setScoreWinner] = useState<string | null>(null);
   const [savingScore, setSavingScore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -281,33 +282,30 @@ ${window.location.origin}`;
 
   const openScoring = (match: ChampionshipMatch) => {
     setScoringMatch(match);
-    setScoreInputA(match.score1 || '');
-    setScoreInputB(match.score2 || '');
+    const existing = match.sets && match.sets.length > 0 ? match.sets : [];
+    setScoreSets([existing[0] || { p1: '', p2: '' }, existing[1] || { p1: '', p2: '' }, existing[2] || { p1: '', p2: '' }]);
     setScoreWinner(match.winnerId || null);
   };
 
   const handleSaveMatchResult = async () => {
     if (!scoringMatch) return;
     const match = scoringMatch;
-    let winnerId = scoreWinner;
-    // Infer winner from scores if not explicitly chosen.
+    const sets = trimSets(scoreSets);
+    // Winner: whoever reaches 2 sets, unless manually overridden (walkover, etc.).
+    const autoWinnerSide = matchWinnerFromSets(sets);
+    const winnerId = scoreWinner || (autoWinnerSide === 'p1' ? match.participant1Id : autoWinnerSide === 'p2' ? match.participant2Id : null) || null;
     if (!winnerId) {
-      const a = parseInt(scoreInputA);
-      const b = parseInt(scoreInputB);
-      if (!isNaN(a) && !isNaN(b) && a !== b) {
-        winnerId = a > b ? match.participant1Id || null : match.participant2Id || null;
-      }
-    }
-    if (!winnerId) {
-      showAlert("Atenção", "Selecione o vencedor da partida.", "warning");
+      showAlert("Atenção", "Complete os sets até um jogador vencer 2, ou selecione o vencedor manualmente.", "warning");
       return;
     }
+    const { p1: setsP1, p2: setsP2 } = setsWonCount(sets);
     const winnerName = winnerId === match.participant1Id ? match.participant1Name : match.participant2Name;
     setSavingScore(true);
     try {
       await updateDoc(doc(db, 'championship_matches', match.id), {
-        score1: scoreInputA || '0',
-        score2: scoreInputB || '0',
+        sets,
+        score1: String(setsP1),
+        score2: String(setsP2),
         winnerId,
         status: 'finished',
         updated_at: new Date().toISOString(),
@@ -323,10 +321,13 @@ ${window.location.origin}`;
       }
       setScoringMatch(null);
       showAlert("Sucesso", "Resultado salvo!", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving match result:', error);
-      handleFirestoreError(error, OperationType.UPDATE, `championship_matches/${match.id}`);
-      showAlert("Erro", "Não foi possível salvar o resultado.", "error");
+      const code = error?.code || '';
+      const msg = code === 'permission-denied'
+        ? 'Permissão negada pelo Firestore. Confirme que as regras foram publicadas.'
+        : (error?.message || String(error));
+      showAlert("Erro ao salvar", msg, "error");
     } finally {
       setSavingScore(false);
     }
@@ -3457,6 +3458,12 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                                 </div>
                               ))}
 
+                              {formatSetsScore(match.sets) && (
+                                <p className="text-[9px] font-bold text-center pb-2" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                                  {formatSetsScore(match.sets)}
+                                </p>
+                              )}
+
                               {canScore && (
                                 <button
                                   onClick={() => openScoring(match)}
@@ -3489,52 +3496,82 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
       })()}
 
       {/* Score entry modal — participant records their result / manager edits freely */}
-      {scoringMatch && (
+      {scoringMatch && (() => {
+        const showThird = needsThirdSet(scoreSets);
+        const visibleSets = showThird ? 3 : 2;
+        const setsCount = setsWonCount(scoreSets);
+        const updateSet = (setIdx: number, side: 'p1' | 'p2', value: string) => {
+          setScoreSets(prev => prev.map((s, i) => i === setIdx ? { ...s, [side]: value } : s));
+        };
+        const players = [
+          { side: 'p1' as const, id: scoringMatch.participant1Id, name: scoringMatch.participant1Name, setsWon: setsCount.p1 },
+          { side: 'p2' as const, id: scoringMatch.participant2Id, name: scoringMatch.participant2Name, setsWon: setsCount.p2 },
+        ];
+        return (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" style={{ background: 'rgba(4,8,6,0.85)' }}>
           <div className="w-full max-w-sm rounded-3xl overflow-hidden" style={{ background: '#141f1a', border: '1px solid rgba(255,255,255,0.1)' }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <h3 className="text-sm font-black text-white uppercase tracking-widest">Resultado</h3>
-              <button onClick={() => setScoringMatch(null)} className="text-white/40 hover:text-white">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest">Resultado</h3>
+                <p className="text-[9px] font-bold mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Melhor de 3 sets · 3º set é tie-break</p>
+              </div>
+              <button onClick={() => setScoringMatch(null)} className="text-white/40 hover:text-white shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-5 space-y-3">
-              {[
-                { id: scoringMatch.participant1Id, name: scoringMatch.participant1Name, score: scoreInputA, setScore: setScoreInputA },
-                { id: scoringMatch.participant2Id, name: scoringMatch.participant2Name, score: scoreInputB, setScore: setScoreInputB },
-              ].map((p, i) => {
+              {/* Set column headers */}
+              <div className="flex items-center gap-2 pl-1">
+                <div className="flex-1 min-w-0" />
+                <div className="flex gap-1.5 shrink-0">
+                  {Array.from({ length: visibleSets }).map((_, i) => (
+                    <span key={i} className="w-11 text-center text-[8px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      {i === 2 ? 'Tie-break' : `Set ${i + 1}`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {players.map((p, pi) => {
                 const selected = scoreWinner === p.id;
                 return (
                   <div
-                    key={i}
-                    className="flex items-center gap-3 rounded-2xl p-3"
+                    key={pi}
+                    className="flex items-center gap-2 rounded-2xl p-3"
                     style={{ background: selected ? 'rgba(200,240,32,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selected ? 'rgba(200,240,32,0.5)' : 'rgba(255,255,255,0.08)'}` }}
                   >
                     <button
                       onClick={() => setScoreWinner(p.id || null)}
                       className="flex-1 text-left min-w-0"
                     >
-                      <span className="block text-[9px] font-black uppercase tracking-widest" style={{ color: selected ? '#c8f020' : 'rgba(255,255,255,0.3)' }}>
+                      <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest" style={{ color: selected ? '#c8f020' : 'rgba(255,255,255,0.3)' }}>
                         {selected ? '✓ Vencedor' : 'Tocar p/ vencedor'}
+                        {p.setsWon > 0 && <span className="text-white/50">· {p.setsWon} set{p.setsWon > 1 ? 's' : ''}</span>}
                       </span>
                       <span className="block text-sm font-bold text-white truncate">{p.name || 'Aguardando...'}</span>
                     </button>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={p.score}
-                      onChange={(e) => p.setScore(e.target.value)}
-                      className="w-14 h-11 text-center text-lg font-black text-white rounded-xl focus:outline-none"
-                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)' }}
-                      placeholder="0"
-                    />
+                    <div className="flex gap-1.5 shrink-0">
+                      {Array.from({ length: visibleSets }).map((_, setIdx) => (
+                        <input
+                          key={setIdx}
+                          type="number"
+                          inputMode="numeric"
+                          value={scoreSets[setIdx][p.side]}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => updateSet(setIdx, p.side, e.target.value)}
+                          className="w-11 h-11 text-center text-base font-black text-white rounded-xl focus:outline-none"
+                          style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)' }}
+                          placeholder="0"
+                        />
+                      ))}
+                    </div>
                   </div>
                 );
               })}
 
               <p className="text-[10px] text-center pt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                Toque no nome do vencedor e informe o placar.
+                {showThird ? 'Sets 1-1 → informe o tie-break do 3º set.' : 'Toque no nome do vencedor ou complete os sets.'}
               </p>
 
               <button
@@ -3548,7 +3585,8 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Animated Booking Confirmation Overlay */}
       <AnimatePresence>

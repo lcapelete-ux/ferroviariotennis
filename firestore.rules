@@ -286,7 +286,7 @@ service cloud.firestore {
       allow update: if canManageChampionships() || (
         isAuthenticated() &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['score1', 'score2', 'winnerId', 'status',
+          .hasOnly(['sets', 'score1', 'score2', 'winnerId', 'status',
                     'participant1Id', 'participant1Name',
                     'participant2Id', 'participant2Name', 'updated_at'])
       );

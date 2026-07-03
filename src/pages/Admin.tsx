@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserProfile, Booking, Championship, ChampionshipRegistration, ChampionshipMatch } from '../types';
+import { UserProfile, Booking, Championship, ChampionshipRegistration, ChampionshipMatch, SetScore } from '../types';
+import { matchWinnerFromSets, needsThirdSet, trimSets, setsWonCount } from '../utils/tennisScore';
 import { format, addDays, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Shield, Users, Calendar as CalendarIcon, AlertTriangle, Download, Trophy, ArrowRight, ArrowLeft, Trash2, FileText, Bell, CheckCircle, Plus, X, ShieldAlert, AlertCircle, Settings, Search } from 'lucide-react';
@@ -1298,46 +1299,48 @@ export default function Admin() {
     return ms.length ? Math.max(...ms.map(m => m.round)) : 1;
   };
 
-  const handleUpdateMatchScore = async (match: ChampionshipMatch, s1: string, s2: string, winnerId?: string) => {
+  const handleUpdateMatchScore = async (match: ChampionshipMatch, sets: SetScore[], winnerId?: string) => {
     try {
-      // If winnerId is not provided, try to infer it from scores if they are numbers
-      let finalWinnerId = winnerId;
-      if (!finalWinnerId) {
-        const score1 = parseInt(s1);
-        const score2 = parseInt(s2);
-        if (!isNaN(score1) && !isNaN(score2)) {
-          finalWinnerId = score1 > score2 ? match.participant1Id : match.participant2Id;
-        }
-      }
+      const cleanSets = trimSets(sets);
+      // Winner: whoever reaches 2 sets, unless manually overridden (walkover, etc.).
+      const autoWinnerSide = matchWinnerFromSets(cleanSets);
+      const finalWinnerId = winnerId || (autoWinnerSide === 'p1' ? match.participant1Id : autoWinnerSide === 'p2' ? match.participant2Id : undefined);
 
       if (!finalWinnerId) {
-        showAlert("Erro", "Por favor, selecione o vencedor da partida.", "error");
+        showAlert("Erro", "Complete os sets até um jogador vencer 2, ou selecione o vencedor manualmente.", "error");
         return;
       }
 
+      const { p1: setsP1, p2: setsP2 } = setsWonCount(cleanSets);
       const winnerName = finalWinnerId === match.participant1Id ? match.participant1Name : match.participant2Name;
-      
+
       await updateDoc(doc(db, 'championship_matches', match.id), {
-        score1: s1,
-        score2: s2,
+        sets: cleanSets,
+        score1: String(setsP1),
+        score2: String(setsP2),
         winnerId: finalWinnerId,
-        status: 'finished'
+        status: 'finished',
+        updated_at: new Date().toISOString(),
       });
-      
+
       // Advance to next match
-      if (match.nextMatchId && finalWinnerId) {
+      if (match.nextMatchId) {
         const isP1 = match.matchNumber % 2 === 0;
         await updateDoc(doc(db, 'championship_matches', match.nextMatchId), {
           [isP1 ? 'participant1Id' : 'participant2Id']: finalWinnerId,
-          [isP1 ? 'participant1Name' : 'participant2Name']: winnerName
+          [isP1 ? 'participant1Name' : 'participant2Name']: winnerName,
+          updated_at: new Date().toISOString(),
         });
       }
-      
+
       showAlert("Sucesso", "Placar atualizado!", "success");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating score:', error);
-      handleFirestoreError(error, OperationType.UPDATE, `championship_matches/${match.id}`);
-      showAlert("Erro", "Falha ao atualizar placar.", "error");
+      const code = error?.code || '';
+      const msg = code === 'permission-denied'
+        ? 'Permissão negada pelo Firestore. Confirme que as regras foram publicadas.'
+        : (error?.message || String(error));
+      showAlert("Erro ao atualizar placar", msg, "error");
     }
   };
 
@@ -2783,6 +2786,21 @@ export default function Admin() {
                         {matchesInRound.length > 0 ? matchesInRound.map(match => {
                           const bothPresent = !!(match.participant1Id && match.participant2Id);
                           const done = match.status === 'finished';
+                          const sets: SetScore[] = (match.sets && match.sets.length > 0)
+                            ? match.sets
+                            : [{ p1: '', p2: '' }, { p1: '', p2: '' }, { p1: '', p2: '' }];
+                          const showThird = needsThirdSet(sets);
+                          const visibleSets = showThird ? 3 : 2;
+                          const setsCount = setsWonCount(sets);
+                          const updateSet = (setIdx: number, side: 'p1' | 'p2', value: string) => {
+                            const newMatches = [...championshipMatches];
+                            const idx = newMatches.findIndex(m => m.id === match.id);
+                            const current = [...sets];
+                            while (current.length <= setIdx) current.push({ p1: '', p2: '' });
+                            current[setIdx] = { ...current[setIdx], [side]: value };
+                            newMatches[idx] = { ...newMatches[idx], sets: current };
+                            setChampionshipMatches(newMatches);
+                          };
                           return (
                             <div key={match.id} className="bg-zinc-50 border-2 border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
                               <div className="px-3 py-2 border-b border-zinc-200 flex justify-between items-center bg-white">
@@ -2793,9 +2811,23 @@ export default function Admin() {
                               </div>
 
                               <div className="p-3 space-y-2">
+                                {/* Set column headers */}
+                                {bothPresent && (
+                                  <div className="flex items-center gap-2 pl-0.5">
+                                    <div className="flex-1 min-w-0" />
+                                    <div className="flex gap-1 shrink-0">
+                                      {Array.from({ length: visibleSets }).map((_, i) => (
+                                        <span key={i} className="w-9 text-center text-[7px] font-black text-zinc-400 uppercase tracking-wider">
+                                          {i === 2 ? 'TB' : `S${i + 1}`}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {[
-                                  { id: match.participant1Id, name: match.participant1Name, score: match.score1, key: 'score1' as const },
-                                  { id: match.participant2Id, name: match.participant2Name, score: match.score2, key: 'score2' as const },
+                                  { id: match.participant1Id, name: match.participant1Name, side: 'p1' as const, setsWon: setsCount.p1 },
+                                  { id: match.participant2Id, name: match.participant2Name, side: 'p2' as const, setsWon: setsCount.p2 },
                                 ].map((p, i) => {
                                   const isWinner = !!(match.winnerId && match.winnerId === p.id);
                                   return (
@@ -2819,28 +2851,31 @@ export default function Admin() {
                                         isWinner ? "text-emerald-700" : p.name ? "text-zinc-700" : "text-zinc-300 italic"
                                       )}>
                                         {p.name || 'Aguardando...'}
+                                        {p.setsWon > 0 && <span className="text-zinc-400 font-normal"> · {p.setsWon}</span>}
                                       </span>
-                                      <input
-                                        type="text"
-                                        value={p.score || ''}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onChange={(e) => {
-                                          const newMatches = [...championshipMatches];
-                                          const idx = newMatches.findIndex(m => m.id === match.id);
-                                          newMatches[idx] = { ...newMatches[idx], [p.key]: e.target.value };
-                                          setChampionshipMatches(newMatches);
-                                        }}
-                                        className="w-11 h-9 text-center text-sm font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-lg focus:border-emerald-500 focus:ring-0 shrink-0"
-                                        placeholder="—"
-                                        disabled={!bothPresent}
-                                      />
+                                      {bothPresent && (
+                                        <div className="flex gap-1 shrink-0">
+                                          {Array.from({ length: visibleSets }).map((_, setIdx) => (
+                                            <input
+                                              key={setIdx}
+                                              type="number"
+                                              inputMode="numeric"
+                                              value={sets[setIdx]?.[p.side] || ''}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => updateSet(setIdx, p.side, e.target.value)}
+                                              className="w-9 h-9 text-center text-xs font-black text-zinc-900 bg-white border-2 border-zinc-200 rounded-lg focus:border-emerald-500 focus:ring-0 shrink-0"
+                                              placeholder="—"
+                                            />
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
 
                                 {bothPresent && (
                                   <button
-                                    onClick={() => handleUpdateMatchScore(match, match.score1 || '0', match.score2 || '0', match.winnerId)}
+                                    onClick={() => handleUpdateMatchScore(match, sets, match.winnerId)}
                                     className={clsx(
                                       "w-full py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95",
                                       done ? "bg-zinc-100 text-zinc-500 hover:bg-zinc-200" : "bg-emerald-600 text-white hover:bg-emerald-700"
