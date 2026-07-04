@@ -3402,8 +3402,8 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                           const p2Wins = !!(match.winnerId && match.winnerId === match.participant2Id);
                           const done = match.status === 'finished';
                           const bothPresent = !!(match.participant1Id && match.participant2Id);
-                          // Any logged-in member can record a pending match's result; managers can also edit finished ones.
-                          const canScore = bothPresent && (!done || canManageChampionships);
+                          // Any logged-in member can record — or later correct — a match's result.
+                          const canScore = bothPresent;
 
                           return (
                             <div
