@@ -270,14 +270,6 @@ ${window.location.origin}`;
     );
   };
 
-  // Registration IDs of the current championship the logged-in user belongs to.
-  const myBracketRegIds = React.useMemo(() => {
-    if (!viewingBracket) return [] as string[];
-    return allRegistrations
-      .filter(r => r.championshipId === viewingBracket && (r.userId1 === user?.uid || r.userId2 === user?.uid))
-      .map(r => r.id);
-  }, [viewingBracket, allRegistrations, user?.uid]);
-
   const canManageChampionships = profile?.role === 'admin' || profile?.role === 'professor' || !!profile?.canManageChampionships;
 
   const openScoring = (match: ChampionshipMatch) => {
@@ -3410,9 +3402,8 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                           const p2Wins = !!(match.winnerId && match.winnerId === match.participant2Id);
                           const done = match.status === 'finished';
                           const bothPresent = !!(match.participant1Id && match.participant2Id);
-                          const isMine = myBracketRegIds.includes(match.participant1Id || '') || myBracketRegIds.includes(match.participant2Id || '');
-                          // Participants can record their own pending match; managers can edit any match freely.
-                          const canScore = bothPresent && ((!done && isMine) || canManageChampionships);
+                          // Any logged-in member can record a pending match's result; managers can also edit finished ones.
+                          const canScore = bothPresent && (!done || canManageChampionships);
 
                           return (
                             <div
