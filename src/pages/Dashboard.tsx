@@ -1127,7 +1127,14 @@ ${window.location.origin}`;
   const handleCancelBooking = async (booking: Booking, forDate?: Date) => {
     const isProfessorOfThisBooking = booking.professorName === profile?.fullName;
     const isPartnerOfThisBooking = booking.partnerId === profile?.uid;
-    if (booking.userId !== profile?.uid && !isPartnerOfThisBooking && profile?.role !== 'admin' && !(profile?.role === 'professor' && isProfessorOfThisBooking)) return;
+    // Any professor can manage any lesson (not just ones whose stored professorName
+    // happens to string-match their profile) — mirrors the Firestore rule and the
+    // existing "Editar" button, which already allow any professor to edit any lesson.
+    const canManageAsProfessor = profile?.role === 'professor' && (booking.type === 'lesson' || isProfessorOfThisBooking);
+    if (booking.userId !== profile?.uid && !isPartnerOfThisBooking && profile?.role !== 'admin' && !canManageAsProfessor) {
+      showAlert("Sem permissão", "Você não tem permissão para cancelar este agendamento.", "warning");
+      return;
+    }
     
     const now = new Date();
     let isLate = false;
@@ -1357,7 +1364,8 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
 
     if (slotBooking) {
       const isProfessorOfThisBooking = slotBooking.professorName === profile?.fullName;
-      const isMyBooking = slotBooking.userId === profile?.uid || (profile?.role === 'professor' && isProfessorOfThisBooking);
+      // Any professor can manage any lesson slot, regardless of whose name ended up stored on it.
+      const isMyBooking = slotBooking.userId === profile?.uid || (profile?.role === 'professor' && (slotBooking.type === 'lesson' || isProfessorOfThisBooking));
       return (
         <div className={clsx(
           "flex flex-col justify-between p-3 rounded-xl border-2 transition-all h-full relative",
@@ -2091,7 +2099,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                                 {booking1 ? (
                                   <button 
                                     onClick={() => {
-                                      if (booking1.userId === profile?.uid || booking1.partnerId === profile?.uid || profile?.role === 'admin') {
+                                      if (booking1.userId === profile?.uid || booking1.partnerId === profile?.uid || profile?.role === 'admin' || (profile?.role === 'professor' && booking1.type === 'lesson')) {
                                         handleCancelBooking(booking1, day);
                                       } else {
                                         setSelectedDate(day);
@@ -2133,7 +2141,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
                                 {booking2 ? (
                                   <button 
                                     onClick={() => {
-                                      if (booking2.userId === profile?.uid || booking2.partnerId === profile?.uid || profile?.role === 'admin') {
+                                      if (booking2.userId === profile?.uid || booking2.partnerId === profile?.uid || profile?.role === 'admin' || (profile?.role === 'professor' && booking2.type === 'lesson')) {
                                         handleCancelBooking(booking2, day);
                                       } else {
                                         setSelectedDate(day);

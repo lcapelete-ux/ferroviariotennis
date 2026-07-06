@@ -248,11 +248,16 @@ service cloud.firestore {
                      isAdmin() || 
                      isProfessor() || 
                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['maintenanceConfirmed', 'observation', 'updated_at'])));
-      allow delete: if isAuthenticated() && 
-                    (resource.data.userId == request.auth.uid || 
+      // Any professor may delete any lesson booking (mirrors the update rule's blanket
+      // isProfessor() grant) — a lesson's stored professorName can drift from the
+      // actual teaching professor's profile (renamed, or picked by an admin at
+      // creation time), so it must not gate the ability to remove it.
+      allow delete: if isAuthenticated() &&
+                    (resource.data.userId == request.auth.uid ||
                      resource.data.partnerId == request.auth.uid ||
-                     isAdmin() || 
-                     (isProfessor() && resource.data.professorName != null && resource.data.professorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fullName));
+                     isAdmin() ||
+                     (isProfessor() && (resource.data.type == 'lesson' ||
+                       (resource.data.professorName != null && resource.data.professorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fullName))));
     }
 
     match /admin_alerts/{alertId} {
