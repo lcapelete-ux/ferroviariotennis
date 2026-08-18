@@ -45,11 +45,11 @@ export default async (_req: Request) => {
     const now = new Date();
 
     // Weekly credit cycle (Brazil time):
-    //   Sunday 11:50 BRT → zero out all user credits (= 0)
-    //   Sunday 12:00 BRT → refill all user credits (= 3)
+    //   Sunday 11:00 BRT → zero out all user credits (= 0)
+    //   Sunday 11:15 BRT → refill all user credits (= 3)
     //   Admins and professors are always set to 99 (unlimited) and excluded from the cycle.
-    const zeroMilestone   = lastBrtSundayMilestone(now, 11, 50); // domingo 11:50 BRT
-    const refillMilestone = lastBrtSundayMilestone(now, 12,  0); // domingo 12:00 BRT
+    const zeroMilestone   = lastBrtSundayMilestone(now, 11,  0); // domingo 11:00 BRT
+    const refillMilestone = lastBrtSundayMilestone(now, 11, 15); // domingo 11:15 BRT
 
     // Whichever milestone is more recent is the one currently in effect
     const [targetMilestone, targetAmount] =

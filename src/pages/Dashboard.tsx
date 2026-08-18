@@ -2815,7 +2815,7 @@ Corra, pois as vagas costumam ser preenchidas rapidamente!`;
               <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                   <h3 className="text-emerald-800 font-black uppercase tracking-tight">Manutenção de Créditos</h3>
-                  <p className="text-emerald-600 text-sm">Force a renovação semanal de créditos de todos os usuários (Domingo 12h).</p>
+                  <p className="text-emerald-600 text-sm">Force a renovação semanal de créditos de todos os usuários (Domingo 11h15).</p>
                 </div>
                 <button 
                   onClick={manualResetCredits}
